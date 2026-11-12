@@ -70,6 +70,17 @@ let phi_candidates = @dom.iterated_frontier(result.forward, definition_indices)
 
 最多允许 512 个变量和 16,384 个定义/使用关联。变量 ID 与节点 ID 使用相同语法；定义、使用的行数必须等于图节点数，每行的变量索引需合法且不重复。返回集合独立持有数组，编辑输入不会改变已有结果。
 
+程序事实的文件格式为 `cairndom.program.v1`，通过 `parse_program` / `program_json_text` 导入导出：
+
+```json
+{"schema":"cairndom.program.v1",
+ "graph":{"schema":"cairndom.graph.v1","nodes":["entry","exit"],"entry":"entry","exits":["exit"],"edges":[["entry","exit"]]},
+ "variables":["value"],
+ "blocks":[{"node":"entry","defines":["value"],"uses":[]},{"node":"exit","defines":[],"uses":["value"]}]}
+```
+
+`blocks` 中未列出的节点表示空定义/使用集合，重复块或未知 ID 会报错。每个列出的块必须包含 `node`、`defines` 和 `uses`。导出按图节点和声明变量顺序排列事实，不修改调用方数组；导入与导出都限制为 2 MiB，以保持文件可重新读取。
+
 完整示例会执行断言并输出分析与 phi 候选点。
 
 ```sh
