@@ -1,0 +1,70 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "Novanke/cairndom"
+
+import {
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn analysis_dot(Analysis) -> String
+
+pub fn analysis_json_text(Analysis) -> String
+
+pub fn analyze(Graph) -> Analysis raise GraphError
+
+pub fn dominates(Dominance, Int32, Int32) -> Bool raise GraphError
+
+pub fn dominators(Graph) -> Dominance raise GraphError
+
+pub fn iterated_frontier(Dominance, Array[Int32], live_in? : Array[Int32]?) -> Array[Int32] raise GraphError
+
+pub fn parse_graph(String) -> Graph raise GraphError
+
+// Errors
+#derive(@debug.Debug)
+pub(all) suberror GraphError {
+  Invalid(String)
+}
+pub fn GraphError::to_repr(Self) -> @debug.Repr
+
+// Types and methods
+pub(all) struct Analysis {
+  graph : Graph
+  forward : Dominance
+  post : Dominance
+  loops : Array[NaturalLoop]
+  components : Array[Component]
+  control_dependencies : Array[Array[Int32]]
+}
+
+pub(all) struct Component {
+  members : Array[Int32]
+  entry_nodes : Array[Int32]
+  cyclic : Bool
+  multiple_entries : Bool
+}
+
+pub(all) struct Dominance {
+  root : Int32
+  reachable : Array[Bool]
+  immediate : Array[Int32?]
+  frontiers : Array[Array[Int32]]
+}
+
+pub(all) struct Graph {
+  nodes : Array[String]
+  edges : Array[(Int32, Int32)]
+  entry : Int32
+  exits : Array[Int32]
+}
+
+pub(all) struct NaturalLoop {
+  header : Int32
+  latches : Array[Int32]
+  members : Array[Int32]
+  parent : Int32?
+}
+
+// Type aliases
+
+// Traits
