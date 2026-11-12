@@ -139,18 +139,28 @@ fn snapshot_graph(input : Graph) -> Graph raise GraphError {
 
 ///|
 /// Reflexive dominance is defined only for nodes reachable from the root.
+/// Public mutable trees are checked structurally before answering any query.
 pub fn dominates(
   tree : Dominance,
   ancestor : Int32,
   node : Int32,
 ) -> Bool raise GraphError {
+  validate_dominance(tree)
   let n = tree.reachable.length()
-  if tree.immediate.length() != n {
-    raise Invalid("invalid dominator tree dimensions")
-  }
   if ancestor < 0 || ancestor >= n || node < 0 || node >= n {
     raise Invalid("dominance query index is outside the tree")
   }
+  dominates_validated(tree, ancestor, node)
+}
+
+///|
+// Internal analyses call this only on freshly computed, valid trees.
+fn dominates_validated(
+  tree : Dominance,
+  ancestor : Int32,
+  node : Int32,
+) -> Bool {
+  let n = tree.reachable.length()
   if !tree.reachable[ancestor] || !tree.reachable[node] {
     return false
   }
@@ -161,13 +171,70 @@ pub fn dominates(
     }
     match tree.immediate[cursor] {
       None => return false
-      Some(parent) => {
-        if parent < 0 || parent >= n {
-          raise Invalid("invalid dominator parent index")
-        }
-        cursor = parent
-      }
+      Some(parent) => cursor = parent
     }
   }
-  raise Invalid("invalid dominator parent cycle")
+  false
+}
+
+///|
+// A tree cannot prove that supplied frontier sets match an original graph.
+// It can reject cycles, broken parent chains and invalid set members before use.
+fn validate_dominance(tree : Dominance) -> Unit raise GraphError {
+  let n = tree.reachable.length()
+  if n < 1 ||
+    n > max_nodes + 1 ||
+    tree.immediate.length() != n ||
+    tree.frontiers.length() != n {
+    raise Invalid("invalid dominator tree dimensions")
+  }
+  if tree.root < 0 ||
+    tree.root >= n ||
+    !tree.reachable[tree.root] ||
+    tree.immediate[tree.root] is Some(_) {
+    raise Invalid("invalid dominator root")
+  }
+  for node in 0..<n {
+    if !tree.reachable[node] {
+      if tree.immediate[node] is Some(_) || !tree.frontiers[node].is_empty() {
+        raise Invalid("unreachable nodes must have no parent or frontier")
+      }
+    } else if node != tree.root {
+      match tree.immediate[node] {
+        Some(parent) if parent >= 0 && parent < n && tree.reachable[parent] =>
+          ()
+        _ => raise Invalid("reachable dominator node has no valid parent")
+      }
+    }
+    if tree.frontiers[node].length() > n {
+      raise Invalid("oversized dominance frontier")
+    }
+    let members = Array::make(n, false)
+    for target in tree.frontiers[node] {
+      if target < 0 || target >= n || !tree.reachable[target] || members[target] {
+        raise Invalid("invalid or duplicate dominance frontier member")
+      }
+      members[target] = true
+    }
+  }
+  let state = Array::make(n, 0)
+  state[tree.root] = 2
+  for node in 0..<n {
+    if !tree.reachable[node] || state[node] == 2 {
+      continue
+    }
+    let chain = []
+    let mut cursor = node
+    while state[cursor] == 0 {
+      state[cursor] = 1
+      chain.push(cursor)
+      cursor = tree.immediate[cursor].unwrap()
+    }
+    if state[cursor] == 1 {
+      raise Invalid("invalid dominator parent cycle")
+    }
+    for target in chain {
+      state[target] = 2
+    }
+  }
 }

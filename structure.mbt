@@ -2,7 +2,7 @@
 fn graph_structure(
   graph : Graph,
   forward : Dominance,
-) -> (Array[NaturalLoop], Array[Component]) raise GraphError {
+) -> (Array[NaturalLoop], Array[Component]) {
   let n = graph.nodes.length()
   let (succ, pred) = adjacency(graph)
 
@@ -84,7 +84,7 @@ fn graph_structure(
   // Collect all back edges for a header before taking predecessor closure.
   let by_header : Array[Array[Int32]] = Array::makei(n, _ => [])
   for (latch, header) in graph.edges {
-    if dominates(forward, header, latch) {
+    if dominates_validated(forward, header, latch) {
       by_header[header].push(latch)
     }
   }
@@ -114,7 +114,7 @@ fn graph_structure(
           continue
         }
         considered[previous] = true
-        if dominates(forward, header, previous) {
+        if dominates_validated(forward, header, previous) {
           included[previous] = true
           stack.push(previous)
         }

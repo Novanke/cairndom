@@ -26,7 +26,7 @@ pub fn analyze(input : Graph) -> Analysis raise GraphError {
     if !post.reachable[from] || !post.reachable[to] {
       continue
     }
-    if from != to && dominates(post, to, from) {
+    if from != to && dominates_validated(post, to, from) {
       continue
     }
     let stop = post.immediate[from]
@@ -65,13 +65,18 @@ pub fn iterated_frontier(
   definitions : Array[Int32],
   live_in~ : Array[Int32]? = None,
 ) -> Array[Int32] raise GraphError {
+  validate_dominance(tree)
+  iterated_frontier_validated(tree, definitions, live_in~)
+}
+
+///|
+// The caller owns a freshly computed or already validated tree.
+fn iterated_frontier_validated(
+  tree : Dominance,
+  definitions : Array[Int32],
+  live_in~ : Array[Int32]? = None,
+) -> Array[Int32] raise GraphError {
   let n = tree.reachable.length()
-  if n == 0 ||
-    n > max_nodes + 1 ||
-    tree.immediate.length() != n ||
-    tree.frontiers.length() != n {
-    raise Invalid("invalid dominator tree dimensions")
-  }
   let allowed = Array::make(n, live_in is None)
   if live_in is Some(nodes) {
     for node in nodes {
