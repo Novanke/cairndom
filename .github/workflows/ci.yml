@@ -43,4 +43,7 @@ jobs:
           moon build --target js --release --deny-warn
           moon run examples/sdk --target wasm-gc --release --deny-warn
           moon run examples/sdk --target js --release --deny-warn
+          moon run examples/ssa_sdk --target wasm-gc --release --deny-warn
+          moon run examples/ssa_sdk --target js --release --deny-warn
           python scripts/verify_cli.py
+          python scripts/verify_ssa_cli.py

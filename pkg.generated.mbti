@@ -12,13 +12,29 @@ pub fn analysis_json_text(Analysis) -> String
 
 pub fn analyze(Graph) -> Analysis raise GraphError
 
+pub fn control_dependence_witnesses(Graph) -> Array[ControlWitness] raise GraphError
+
 pub fn dominates(Dominance, Int32, Int32) -> Bool raise GraphError
 
 pub fn dominators(Graph) -> Dominance raise GraphError
 
+pub fn graph_json_text(Graph) -> String raise GraphError
+
 pub fn iterated_frontier(Dominance, Array[Int32], live_in? : Array[Int32]?) -> Array[Int32] raise GraphError
 
+pub fn liveness(FlowProgram) -> Liveness raise GraphError
+
+pub fn loop_boundaries(Graph) -> Array[LoopBoundary] raise GraphError
+
 pub fn parse_graph(String) -> Graph raise GraphError
+
+pub fn parse_program(String) -> FlowProgram raise GraphError
+
+pub fn plan_ssa(FlowProgram) -> SsaPlan raise GraphError
+
+pub fn program_json_text(FlowProgram) -> String raise GraphError
+
+pub fn ssa_plan_json_text(FlowProgram) -> String raise GraphError
 
 // Errors
 #derive(@debug.Debug)
@@ -44,11 +60,28 @@ pub(all) struct Component {
   multiple_entries : Bool
 }
 
+#derive(Eq, @debug.Debug)
+pub(all) struct ControlWitness {
+  controller : Int32
+  successor : Int32
+  dependent : Int32
+}
+pub fn ControlWitness::equal(Self, Self) -> Bool
+pub fn ControlWitness::not_equal(Self, Self) -> Bool
+pub fn ControlWitness::to_repr(Self) -> @debug.Repr
+
 pub(all) struct Dominance {
   root : Int32
   reachable : Array[Bool]
   immediate : Array[Int32?]
   frontiers : Array[Array[Int32]]
+}
+
+pub(all) struct FlowProgram {
+  graph : Graph
+  variables : Array[String]
+  definitions : Array[Array[Int32]]
+  uses : Array[Array[Int32]]
 }
 
 pub(all) struct Graph {
@@ -58,11 +91,42 @@ pub(all) struct Graph {
   exits : Array[Int32]
 }
 
+pub(all) struct Liveness {
+  reachable : Array[Bool]
+  live_in : Array[Array[Int32]]
+  live_out : Array[Array[Int32]]
+}
+
+#derive(Eq, @debug.Debug)
+pub(all) struct LoopBoundary {
+  header : Int32
+  entering_edges : Array[(Int32, Int32)]
+  leaving_edges : Array[(Int32, Int32)]
+  back_edges : Array[(Int32, Int32)]
+}
+pub fn LoopBoundary::equal(Self, Self) -> Bool
+pub fn LoopBoundary::not_equal(Self, Self) -> Bool
+pub fn LoopBoundary::to_repr(Self) -> @debug.Repr
+
 pub(all) struct NaturalLoop {
   header : Int32
   latches : Array[Int32]
   members : Array[Int32]
   parent : Int32?
+}
+
+pub(all) struct PhiPlacement {
+  variable : Int32
+  definitions : Array[Int32]
+  live_in : Array[Int32]
+  phi_nodes : Array[Int32]
+  requires_entry_value : Bool
+}
+
+pub(all) struct SsaPlan {
+  program : FlowProgram
+  liveness : Liveness
+  placements : Array[PhiPlacement]
 }
 
 // Type aliases

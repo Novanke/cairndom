@@ -158,6 +158,7 @@ fn io(
 
 ///|
 priv struct Options {
+  command : String
   input : String
   format : String
   output : String?
@@ -165,8 +166,10 @@ priv struct Options {
 
 ///|
 fn parse_options(args : Array[String]) -> Options raise CommandError {
-  if args.is_empty() || args[0] != "analyze" {
-    raise CommandError("usage", "expected analyze INPUT; run help for usage")
+  if args.is_empty() || (args[0] != "analyze" && args[0] != "plan-ssa") {
+    raise CommandError(
+      "usage", "expected analyze or plan-ssa INPUT; run help for usage",
+    )
   }
   let mut input : String? = None
   let mut format : String? = None
@@ -212,18 +215,28 @@ fn parse_options(args : Array[String]) -> Options raise CommandError {
     Some(path) => path
     None => raise CommandError("usage", "missing input path")
   }
-  { input, format: format.unwrap_or("json"), output, }
+  if args[0] == "plan-ssa" && format == Some("dot") {
+    raise CommandError(
+      "usage", "plan-ssa produces JSON; DOT is only available for analyze",
+    )
+  }
+  { command: args[0], input, format: format.unwrap_or("json"), output, }
 }
 
 ///|
 fn execute(args : Array[String]) -> Unit raise {
   let options = parse_options(args)
-  let graph = @cairn.parse_graph(io("read", options.input))
-  let analysis = @cairn.analyze(graph)
-  let rendered = if options.format == "dot" {
-    @cairn.analysis_dot(analysis)
+  let input = io("read", options.input)
+  let rendered = if options.command == "plan-ssa" {
+    @cairn.ssa_plan_json_text(@cairn.parse_program(input))
   } else {
-    @cairn.analysis_json_text(analysis)
+    let graph = @cairn.parse_graph(input)
+    let analysis = @cairn.analyze(graph)
+    if options.format == "dot" {
+      @cairn.analysis_dot(analysis)
+    } else {
+      @cairn.analysis_json_text(analysis)
+    }
   }
   let text = rendered + "\n"
   if @utf8.encode(text).length() > 16777216 {
@@ -252,14 +265,20 @@ fn main {
   let help = ["help", "--help", "-h"]
   if args.is_empty() ||
     (args.length() == 1 && help.contains(args[0])) ||
-    (args.length() == 2 && args[0] == "analyze" && help.contains(args[1])) {
+    (
+      args.length() == 2 &&
+      (args[0] == "analyze" || args[0] == "plan-ssa") &&
+      help.contains(args[1])
+    ) {
     println(
       "CairnDom — control-flow graph analysis\n" +
       "analyze INPUT [--format json|dot] [--out NEW_FILE]\n" +
+      "plan-ssa INPUT [--out NEW_FILE]\n" +
       "help\n" +
       "JSON is the default format. Without --out, the result is written to stdout.\n" +
       "Input must be a regular UTF-8 file of at most 2 MiB. Output is limited to 16 MiB.\n" +
       "--out publishes a new file through staged hard-link creation; its parent must exist.\n" +
+      "Phi reports contain locations only; callers provide entry values and any IR rewriting.\n" +
       "Node.js 22.16+ is required. Exit 0 means analysis produced; exit 2 means input or I/O error.",
     )
   } else {

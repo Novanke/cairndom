@@ -1,6 +1,6 @@
 # CairnDom
 
-CairnDom 是纯 MoonBit 控制流图分析基础库，提供支配树、支配边界、后支配关系、控制依赖、自然循环和强连通分量。它可以作为编译器、静态分析器及图工具的公共算法组件。命令行工具直接读取语言无关的图文件，生成可供人工核对或程序消费的 JSON 与 DOT。
+CairnDom 是纯 MoonBit 控制流图分析基础库，提供支配树、支配边界、后支配关系、控制依赖、自然循环、强连通分量、变量活跃性和 SSA 候选位置规划。它可以作为编译器、静态分析器及图工具的公共算法组件。命令行工具直接读取语言无关的图文件，生成可供人工核对或程序消费的 JSON 与 DOT。
 
 例如，图中的两个分支分别定义一个变量，SDK 可根据迭代支配边界找出 SSA 的 phi 候选位置。CLI 则直接指出分支汇合点、循环头、回边来源、不可达节点，以及哪些可达节点没有到达声明出口的路径。
 
@@ -12,9 +12,13 @@ CairnDom 是纯 MoonBit 控制流图分析基础库，提供支配树、支配�
 moon build --target js --release --deny-warn
 node _build/js/release/build/cmd/main/main.js analyze examples/branch-loop.json
 node _build/js/release/build/cmd/main/main.js analyze examples/branch-loop.json --format dot --out graph.dot
+node _build/js/release/build/cmd/main/main.js plan-ssa examples/ssa-branch.json
+node _build/js/release/build/cmd/main/main.js plan-ssa examples/ssa-branch.json --out phi-plan.json
 ```
 
 样例报告中，`left` 和 `right` 的支配边界都是 `join`，`head` 与 `body` 形成一个以 `head` 为头的自然循环，`dead` 不可达。蓝色虚线 DOT 边是直接支配关系，普通边保留原始控制流。DOT 是图描述文件，可由支持该格式的工具进一步渲染。
+
+`plan-ssa` 的样例中，两个分支定义 `value` 与 `unused`，汇合块仅使用 `value` 和 `parameter`。输出会为 `value` 在 `join` 安排候选，为未使用的 `unused` 删除候选，并将 `parameter` 列入 `entry_values_required`。报告的 `status` 为 `locations_only`，其中同时给出各块活跃集合和按变量分组的候选；不会生成重命名后的指令或可执行程序。该命令只输出 JSON，并复用相同的输入校验与新文件独占发布约定。
 
 不传 `--out` 时结果写 stdout。错误为 stderr 上的 JSON，退出码 2。退出码 0 表示成功生成分析，图中仍可能存在不可达节点、多入口循环或无法到达出口的节点。
 
@@ -53,7 +57,7 @@ SDK 的 `loop_boundaries(graph)` 为每个自然循环列出进入边、离开�
 ## SDK
 
 ```sh
-moon add Novanke/cairndom@0.1.0
+moon add Novanke/cairndom@0.2.0
 ```
 
 在调用方 `moon.pkg` 中导入 `"Novanke/cairndom" @dom`。可直接构建 `Graph`，或调用 `parse_graph`。核心入口为 `analyze`，也可单独调用 `dominators`。图边使用节点数组索引。
@@ -92,6 +96,8 @@ let phi_candidates = @dom.iterated_frontier(result.forward, definition_indices)
 ```sh
 moon run examples/sdk --target wasm-gc --release --deny-warn
 moon run examples/sdk --target js --release --deny-warn
+moon run examples/ssa_sdk --target wasm-gc --release --deny-warn
+moon run examples/ssa_sdk --target js --release --deny-warn
 ```
 
 ## 验证与维护
@@ -104,6 +110,7 @@ moon test --target wasm-gc --deny-warn
 moon test --target js --deny-warn
 moon build --target js --release --deny-warn
 python scripts/verify_cli.py
+python scripts/verify_ssa_cli.py
 ```
 
 独立核对方法、复现结果及后续方向见 [验证记录](docs/verification.md)。CI 在 Windows/Linux 上执行双后端检查、测试、示例和真实文件核对。

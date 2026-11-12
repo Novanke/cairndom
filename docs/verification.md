@@ -25,8 +25,8 @@ filesystem limits. Its `--node` and `--cli` arguments allow the same checks agai
 a separately installed registry consumer.
 
 Local verification on Windows with the versions above passed both backend
-checks, all 17 test blocks on each backend, the optimized JavaScript build and
-both SDK example runs. The separate CLI oracle passed 115 graph cases and 159
+checks, all 57 test blocks on each backend, the optimized JavaScript build and
+both SDK examples on both backends. The separate graph CLI oracle passed 115 graph cases and 159
 actual process invocations, including maximum graph limits, exact input size,
 partial writes, close failures and a competing output writer. Windows symlink
 checks were skipped because this account cannot create symlinks; FIFO
@@ -39,10 +39,36 @@ not constitute a complete nested irreducibility classifier. The current graph
 limits are 512 nodes and 8,192 edges. CHK is an iterative algorithm with quadratic
 worst-case behavior; no performance benchmark or adoption claim is made.
 
+The 0.2.0 implementation adds structural validation before public dominance
+queries, bounded edge-level control witnesses, natural-loop boundary edges,
+graph wire round trips, named block-variable fact import/export, backward
+liveness and live-in-pruned phi planning. A node-removal/set-definition oracle
+checks control witnesses; a finite-path use-before-definition oracle checks
+liveness, including permanent cycles. Separate SSA integration tests derive
+dominance and iterated frontier closure independently from production code.
+
+Dense real graph cases check exact witness capacity and rejection of oversized
+loop-boundary expansion. A valid maximum typed program checks the 2 MiB program
+export guard; dense liveness checks the 16 MiB SSA report guard. SDK APIs reject
+oversized complete witnesses/boundaries instead of silently returning partial
+results. Analysis JSON can retain a bounded witness prefix but explicitly marks
+`control_witnesses_complete: false`; node-level control relations remain complete.
+
+`python scripts/verify_ssa_cli.py` checks named fact files through the optimized
+`plan-ssa` command, independently calculating liveness and pruned phi closure,
+and exercising input/format errors and non-overwriting publication. Both scripts
+support `--node` and `--cli` for verification of a separately installed package.
+The local Windows run passed 42 program oracle cases and 76 real invocations,
+including Unicode/space paths, input preservation, an existing destination and
+an injected partial output write. This is a file-to-report workflow; no IR
+conversion or source-language semantics are inferred.
+
 Next useful work follows correctness evidence and real consumers. Candidate
-directions are edge-by-edge control-dependence witnesses, caller-provided liveness
-integration, and efficient repeated dominance queries. General IR parsing and
-program rewriting require separate designs and are not part of this release.
+directions are efficient immutable dominance-query indexes and explicit
+data-dependence inputs for program slicing. General source-language/IR parsing,
+instruction ordering, variable renaming and program rewriting require separate
+designs. The current phi planner reports locations and incoming-value needs;
+it does not establish that an executable program has been converted to SSA.
 
 Release verification must use the exact Git commit on public CI, publish its
 Mooncakes archive, install that exact version in a new external consumer, and

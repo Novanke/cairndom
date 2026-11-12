@@ -1,0 +1,16 @@
+{
+  "schema": "cairndom.program.v1",
+  "graph": {
+    "schema": "cairndom.graph.v1",
+    "nodes": ["entry", "left", "right", "join", "exit", "dead"],
+    "entry": "entry",
+    "exits": ["exit"],
+    "edges": [["entry", "left"], ["entry", "right"], ["left", "join"], ["right", "join"], ["join", "exit"]]
+  },
+  "variables": ["value", "unused", "parameter"],
+  "blocks": [
+    {"node": "left", "defines": ["value", "unused"], "uses": []},
+    {"node": "right", "defines": ["value", "unused"], "uses": []},
+    {"node": "join", "defines": [], "uses": ["value", "parameter"]}
+  ]
+}

@@ -296,7 +296,13 @@ def verify_graphs(checks):
     for name, graph in fixtures():
         checks.check_graph(name, graph)
     for path in sorted((ROOT / "examples").glob("*.json")):
-        checks.check_graph("example-" + path.stem, json.loads(path.read_text(encoding="utf-8")))
+        example = json.loads(path.read_text(encoding="utf-8"))
+        if example.get("schema") == GRAPH_SCHEMA:
+            checks.check_graph("example-" + path.stem, example)
+        else:
+            require(example.get("schema") == "cairndom.program.v1",
+                    f"Unknown example schema: {path}")
+            # Program examples are exercised by verify_ssa_cli.py.
     rng = random.Random(0xCA17D0)
     for sample in range(100):
         n = rng.randint(1, 12)

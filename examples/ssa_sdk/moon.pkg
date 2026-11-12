@@ -1,0 +1,5 @@
+import {
+  "Novanke/cairndom" @dom,
+}
+
+pkgtype(kind: "executable")
