@@ -3,3 +3,4 @@
 /.mooncakes/
 /artifacts/
 __pycache__/
+/.cairndom-verify-*/

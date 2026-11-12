@@ -15,5 +15,7 @@ fn main raise {
   assert_eq(result.post.immediate[0], Some(3))
   assert_eq(result.control_dependencies[1], [0])
   println(@dom.analysis_json_text(result))
-  println("SSA phi candidate nodes: " + sites.map(i => graph.nodes[i]).join(", "))
+  println(
+    "SSA phi candidate nodes: " + sites.map(i => graph.nodes[i]).join(", "),
+  )
 }

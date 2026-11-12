@@ -1,0 +1,18 @@
+{
+  "schema": "cairndom.graph.v1",
+  "nodes": ["entry", "choose", "left", "right", "join", "head", "body", "exit", "dead"],
+  "entry": "entry",
+  "exits": ["exit"],
+  "edges": [
+    ["entry", "choose"],
+    ["choose", "left"],
+    ["choose", "right"],
+    ["left", "join"],
+    ["right", "join"],
+    ["join", "head"],
+    ["head", "body"],
+    ["body", "head"],
+    ["head", "exit"],
+    ["dead", "dead"]
+  ]
+}

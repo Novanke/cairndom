@@ -1,6 +1,5 @@
 import {
   "Novanke/cairndom" @dom,
 }
-options(
-  "is-main": true,
-)
+
+pkgtype(kind: "executable")
