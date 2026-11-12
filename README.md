@@ -36,6 +36,8 @@ node _build/js/release/build/cmd/main/main.js analyze examples/branch-loop.json 
 
 最多支持 512 个节点、8,192 条边。CLI 输入为普通 UTF-8 文件，最多 2 MiB，输出最多 16 MiB。符号链接路径和特殊文件会被拒绝。节点与集合按输入节点索引排序，固定图的输出确定。
 
+SDK 构建或编辑图后，可用 `graph_json_text(graph)` 生成同一 `cairndom.graph.v1` 格式，再交给 `parse_graph` 或文件 CLI。导出前会校验图，保留节点、边和出口的输入顺序；分析报告本身是另一种格式，不应当作原图重新导入。
+
 支配关系仅覆盖入口可达子图。入口自身的直接支配节点为空，不可达节点也为空，应同时检查 `reachable`。
 
 后支配使用虚拟出口，**仅针对入口可达且最终到达声明出口的有限路径**。报告以 `can_reach_exit` 和 `postdominator_is_virtual_exit` 区分无出口路径与虚拟父节点。这种分析不会证明所有执行都终止，分支进入永久循环时尤其需要保留该范围解释。控制依赖采用同一有限出口路径范围。
