@@ -81,6 +81,10 @@ let phi_candidates = @dom.iterated_frontier(result.forward, definition_indices)
 
 `blocks` 中未列出的节点表示空定义/使用集合，重复块或未知 ID 会报错。每个列出的块必须包含 `node`、`defines` 和 `uses`。导出按图节点和声明变量顺序排列事实，不修改调用方数组；导入与导出都限制为 2 MiB，以保持文件可重新读取。
 
+`plan_ssa(program)` 将活跃性与迭代支配边界连接起来，对每个变量返回定义块、活跃入口块和剪枝后的 `phi_nodes`。未使用的变量不产生候选，不可达块的事实不参与规划。`SsaPlan` 保留输入程序的完整副本。
+
+每项中的 `requires_entry_value` 表示变量在入口块的本地定义之前就需要值。调用方应提供参数或初始值，或按源语言规则报告缺少初始化。该工具生成候选位置，不推断语句顺序、不重命名变量、不改写 IR，也不保证一个程序已经转换为可执行的 SSA。
+
 完整示例会执行断言并输出分析与 phi 候选点。
 
 ```sh
