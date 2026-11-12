@@ -40,6 +40,10 @@ node _build/js/release/build/cmd/main/main.js analyze examples/branch-loop.json 
 
 后支配使用虚拟出口，**仅针对入口可达且最终到达声明出口的有限路径**。报告以 `can_reach_exit` 和 `postdominator_is_virtual_exit` 区分无出口路径与虚拟父节点。这种分析不会证明所有执行都终止，分支进入永久循环时尤其需要保留该范围解释。控制依赖采用同一有限出口路径范围。
 
+`control_dependence_witnesses(graph)` 返回造成控制依赖的原始分支边。JSON 报告中的 `control_witnesses` 保留 `controller`、`successor` 和 `dependent`，可区分同一分支的不同出口，也能解释循环的自控制依赖；该信息同样遵守有限出口路径范围。
+
+边级证据上限为 65,536 条。超过上限时 SDK 报错；JSON 报告保留按索引排序的前缀，并将 `control_witnesses_complete` 标为 `false`，节点级控制依赖仍完整。需要完整边级证据的调用方必须检查此标志。这个上限避免密集分支图生成数百万条重复展开记录。
+
 自然循环由“循环头支配回边来源”定义，同一头的回边合并。多入口 SCC 会单独标记，它们可能没有自然循环头。SCC 的 `multiple_entries` 只描述该分量的入口数，完整的嵌套不可约性分类仍属后续工作。
 
 ## SDK

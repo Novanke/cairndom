@@ -98,6 +98,14 @@ def expected_analysis(graph):
     # A node depends on a branch when it postdominates one of the branch's
     # successors, but does not strictly postdominate the branch itself.
     controls = [set() for _ in names]
+    control_witnesses = []
+    for controller, successor in sorted(edges):
+        if controller in exit_scope and successor in exit_scope:
+            for dependent in sorted(postdom[successor] - (postdom[controller] - {controller})):
+                if dependent < n:
+                    control_witnesses.append({"controller": names[controller],
+                                              "successor": names[successor],
+                                              "dependent": names[dependent]})
     for controller in sorted(exit_scope - {n}):
         successor_postdominators = set()
         for successor in succ[controller]:
@@ -167,6 +175,9 @@ def expected_analysis(graph):
         } for node, name in enumerate(names)],
         "natural_loops": loops,
         "components": components,
+        "control_witnesses": control_witnesses,
+        "control_witnesses_complete": True,
+        "control_witness_limit": 65536,
     }
 
 
