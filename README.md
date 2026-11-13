@@ -14,6 +14,7 @@ node _build/js/release/build/cmd/main/main.js analyze examples/branch-loop.json
 node _build/js/release/build/cmd/main/main.js analyze examples/branch-loop.json --format dot --out graph.dot
 node _build/js/release/build/cmd/main/main.js plan-ssa examples/ssa-branch.json
 node _build/js/release/build/cmd/main/main.js plan-ssa examples/ssa-branch.json --out phi-plan.json
+node _build/js/release/build/cmd/main/main.js query examples/queries.json
 ```
 
 样例报告中，`left` 和 `right` 的支配边界都是 `join`，`head` 与 `body` 形成一个以 `head` 为头的自然循环，`dead` 不可达。蓝色虚线 DOT 边是直接支配关系，普通边保留原始控制流。DOT 是图描述文件，可由支持该格式的工具进一步渲染。
@@ -21,6 +22,8 @@ node _build/js/release/build/cmd/main/main.js plan-ssa examples/ssa-branch.json 
 `plan-ssa` 的样例中，两个分支定义 `value` 与 `unused`，汇合块仅使用 `value` 和 `parameter`。输出会为 `value` 在 `join` 安排候选，为未使用的 `unused` 删除候选，并将 `parameter` 列入 `entry_values_required`。报告的 `status` 为 `locations_only`，其中同时给出各块活跃集合和按变量分组的候选；不会生成重命名后的指令或可执行程序。该命令只输出 JSON，并复用相同的输入校验与新文件独占发布约定。
 
 不传 `--out` 时结果写 stdout。错误为 stderr 上的 JSON，退出码 2。退出码 0 表示成功生成分析，图中仍可能存在不可达节点、多入口循环或无法到达出口的节点。
+
+标准输出处理写入回调、背压和流错误；写出时接收端已关闭等可观测 I/O 故障返回 2。失败之前可能已写出报告前缀，管道输出不具有 `--out` 新文件发布的原子性。标准错误也无法写入时仍保留退出码 2。
 
 `--out` 的目标必须是新文件，父目录须已存在且支持硬链接。完整报告先写入同目录暂存区并同步，再独占发布，拒绝覆盖输入及已有文件。中断或清理失败可能留下 `.cairndom-*` 暂存目录。文件操作面向可信本地目录，时间与身份复查提供顺序观测。
 
@@ -57,7 +60,7 @@ SDK 的 `loop_boundaries(graph)` 为每个自然循环列出进入边、离开�
 ## SDK
 
 ```sh
-moon add Novanke/cairndom@0.2.0
+moon add Novanke/cairndom@0.3.0
 ```
 
 在调用方 `moon.pkg` 中导入 `"Novanke/cairndom" @dom`。可直接构建 `Graph`，或调用 `parse_graph`。核心入口为 `analyze`，也可单独调用 `dominators`。图边使用节点数组索引。
@@ -71,6 +74,20 @@ let phi_candidates = @dom.iterated_frontier(result.forward, definition_indices)
 `iterated_frontier` 可接收调用方提供的 `live_in` 节点做剪枝。该接口计算候选位置，调用方负责变量定义、活跃性和具体 IR。后支配树中的虚拟出口索引为 `graph.nodes.length()`。分析结果拥有输入数组的副本。序列化函数要求结果仍保持 `analyze` 生成的有效结构，编辑图后应再次分析。
 
 公开支配查询会先检查树的完整结构，拒绝父链成环、断链、无效根和损坏的边界集合。结构检查无法证明手工填写的支配边界与原图在数学上相符；编辑图后应重新调用 `analyze` 或 `dominators`。
+
+反复查询同一棵树时，用 `index_dominance(tree)` 一次校验并建立不可变快照：
+
+```moonbit
+let index = @dom.index_dominance(result.forward)
+let yes = index.dominates(ancestor_index, target_index)
+let common = index.nearest_common([left_index, right_index])
+```
+
+索引按 DFS 区间判断支配，单次为 O(1)；公共支配节点使用倍增祖先表，k 个操作数为 O(k log n)。索引不暴露内部数组，原树之后的修改不会影响已有答案；图变化后需重新分析和建立索引。这是算法复杂度说明，不是运行时间承诺。空集合或含不可达节点的最近公共查询返回 `None`，越界索引始终报错。后支配索引可返回虚拟出口索引。
+
+文件批量查询使用 `cairndom.queries.v1`：包含 `graph`、`tree`（`forward` 或 `post`）和 `queries`。每项为 `{"operation":"dominates","ancestor":"entry","node":"join"}` 或 `{"operation":"nearest_common","nodes":["left","right"]}`。`query` 命令只建立一次索引；样例中两个分支的最近公共支配节点是 `entry`，`join` 和 `exit` 的是 `join`。JSON 入口也可直接通过 SDK 的 `query_json_text` 调用。
+
+查询最多 4,096 项、合计 16,384 个操作数，输入 2 MiB，输出 16 MiB。操作数使用原图 ID，支持重复节点和空列表；不接受虚拟出口作为输入 ID。`found: false` 表示没有结果，`found: true` 且 `virtual_exit: true` 表示结果是后支配虚拟出口，二者不能混同。后支配继续采用前述有限出口路径范围。
 
 `FlowProgram` 为每个块提供变量定义和使用集合，`liveness(program)` 返回按变量索引排序的 `live_in` / `live_out`。这里的 `uses` 表示块内该变量首次定义之前的使用，同一变量可同时出现在使用和定义中。活跃性覆盖全部入口可达路径，包括永久循环；不可达块的结果为空，声明出口不会裁掉这些数据流路径。
 
@@ -98,6 +115,8 @@ moon run examples/sdk --target wasm-gc --release --deny-warn
 moon run examples/sdk --target js --release --deny-warn
 moon run examples/ssa_sdk --target wasm-gc --release --deny-warn
 moon run examples/ssa_sdk --target js --release --deny-warn
+moon run examples/query_sdk --target wasm-gc --release --deny-warn
+moon run examples/query_sdk --target js --release --deny-warn
 ```
 
 ## 验证与维护
@@ -111,9 +130,13 @@ moon test --target js --deny-warn
 moon build --target js --release --deny-warn
 python scripts/verify_cli.py
 python scripts/verify_ssa_cli.py
+python scripts/verify_queries.py
+python scripts/verify_stdout.py
 ```
 
 独立核对方法、复现结果及后续方向见 [验证记录](docs/verification.md)。CI 在 Windows/Linux 上执行双后端检查、测试、示例和真实文件核对。
+
+独立的节点删除、集合方程和用例生成位于 MoonBit 的 `verification/reference`，不调用生产分析算法生成预期答案。Python 只负责真实文件、进程、管道及故障注入适配；三个文件验证入口共享同一输出契约。`moon build --target js --release` 同时构建参考命令，验证脚本也接受 `--oracle` 指定它的位置。生产库、测试、独立验证器与主机适配的语言统计分别记录在 [语言构成说明](docs/languages.md)。
 
 ## 算法与来源
 

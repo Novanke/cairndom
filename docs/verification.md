@@ -25,8 +25,8 @@ filesystem limits. Its `--node` and `--cli` arguments allow the same checks agai
 a separately installed registry consumer.
 
 Local verification on Windows with the versions above passed both backend
-checks, all 57 test blocks on each backend, the optimized JavaScript build and
-both SDK examples on both backends. The separate graph CLI oracle passed 115 graph cases and 159
+checks, all 70 test blocks on each backend, the optimized JavaScript build and
+the SDK examples on both backends. The separate graph CLI oracle passed 115 graph cases and 161
 actual process invocations, including maximum graph limits, exact input size,
 partial writes, close failures and a competing output writer. Windows symlink
 checks were skipped because this account cannot create symlinks; FIFO
@@ -58,14 +58,40 @@ results. Analysis JSON can retain a bounded witness prefix but explicitly marks
 `plan-ssa` command, independently calculating liveness and pruned phi closure,
 and exercising input/format errors and non-overwriting publication. Both scripts
 support `--node` and `--cli` for verification of a separately installed package.
-The local Windows run passed 42 program oracle cases and 76 real invocations,
+The local Windows run passed 42 program oracle cases and 77 real invocations,
 including Unicode/space paths, input preservation, an existing destination and
 an injected partial output write. This is a file-to-report workflow; no IR
 conversion or source-language semantics are inferred.
 
+The 0.3.0 implementation builds an opaque, independently owned dominance index
+with DFS intervals and binary-lifting ancestors. Exhaustive independent tests
+compare dominance and nearest-common answers, including unreachable nodes,
+mutated source arrays, nonzero roots and the 513-slot postdominator bound.
+The query CLI reuses one index for strict named batches; twelve real batch/file
+cases passed 44 invocations against node-removal/set-intersection references.
+
+Stdout previously used console logging, which could swallow a closed-pipe error
+and exit successfully. The stream adapter now observes callbacks/error events,
+handles backpressure and routes failures through the MoonBit JSON diagnostic.
+Thirty real invocations cover analyze/plan-ssa/query/help, closed stdout/stderr,
+callback and event failures, synchronous throws, and an independently consumed
+3,504,328-byte report with a slow reader. Partial stdout bytes cannot be rolled
+back; the atomic new-file convention applies to `--out` only. The bridge follows
+[Node 22 process I/O](https://nodejs.org/download/release/v22.16.0/docs/api/process.html#a-note-on-process-io)
+and [write callback semantics](https://nodejs.org/download/release/v22.16.0/docs/api/stream.html#writablewritechunk-encoding-callback).
+
+Reference mathematics and portable cases now live in `verification/reference`.
+They use production graph/program parsers and types, but do not call production
+analysis algorithms or serializers to derive expected answers. Before removing
+the old Python mathematics, the migrated reference was compared with an external
+backup: 113 reports, 113 DOT strings and 40 SSA reports matched exactly. Ten query
+batches (425 answers) also matched the original node-removal definitions.
+Python remains the shared host for files, processes, pipes and fault injection.
+Use `--oracle` to select a separately compiled reference command when needed.
+
 Next useful work follows correctness evidence and real consumers. Candidate
-directions are efficient immutable dominance-query indexes and explicit
-data-dependence inputs for program slicing. General source-language/IR parsing,
+directions include explicit data-dependence inputs for program slicing and an
+exact-snapshot SSA report interface. General source-language/IR parsing,
 instruction ordering, variable renaming and program rewriting require separate
 designs. The current phi planner reports locations and incoming-value needs;
 it does not establish that an executable program has been converted to SSA.

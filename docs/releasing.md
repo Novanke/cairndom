@@ -7,7 +7,9 @@
    and the README's exact dependency version together.
 3. Run formatting, public-interface generation, Wasm GC and JavaScript checks
    and tests, the optimized JavaScript build, both SDK examples on both backends,
-   `python scripts/verify_cli.py` and `python scripts/verify_ssa_cli.py`.
+   the four Python host entry points: `verify_cli.py`, `verify_ssa_cli.py`,
+   `verify_queries.py` and `verify_stdout.py`. The full JS release build includes
+   the independent MoonBit reference command used by those entry points.
    Record unavailable filesystem capabilities instead of claiming they ran.
 4. Review the actual source diff and commit meaningful complete changes. Push
    without rewriting remote history. Confirm that the public Windows and Linux
@@ -21,11 +23,14 @@
 7. Create a new consumer outside this repository with an exact registry version
    dependency and no prior build/cache directory. Run real public-API assertions
    on both backends. Compare the installed original files with the archive and
-   Git commit. Build the installed package's CLI and run both real-file scripts
-   against that installed CLI, including its new-file refusal behavior.
-8. After those checks, create and push the matching annotated version tag. Verify
-   its public dereferenced commit. Include the exact CI run, checksum and consumer
-   result in the tag message or an external release evidence record.
+   Git commit. Build the installed package's CLI and run all four host entry points
+   against that installed CLI, including new-file refusal and stdout failures.
+8. After those checks, create and push the matching version tag (prefer annotated).
+   If normal Git transport fails, the GitHub release UI may create a tag fixed to
+   the exact verified commit. Verify its public dereferenced commit and record
+   its type. Align only a local tag created by this release, never an unrelated
+   user tag. Include CI, checksum and consumer results in the tag/release notes
+   or an external release evidence record.
 
 Do not invent code volume, adoption, speed, tests or history to satisfy a numeric
 target. Keep algorithm limits and planning-only semantics visible. The project

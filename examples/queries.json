@@ -1,0 +1,18 @@
+{
+  "schema": "cairndom.queries.v1",
+  "graph": {
+    "schema": "cairndom.graph.v1",
+    "nodes": ["entry", "left", "right", "join", "exit", "dead"],
+    "entry": "entry",
+    "exits": ["exit"],
+    "edges": [["entry", "left"], ["entry", "right"], ["left", "join"], ["right", "join"], ["join", "exit"]]
+  },
+  "tree": "forward",
+  "queries": [
+    {"operation": "dominates", "ancestor": "entry", "node": "join"},
+    {"operation": "dominates", "ancestor": "left", "node": "join"},
+    {"operation": "nearest_common", "nodes": ["left", "right"]},
+    {"operation": "nearest_common", "nodes": ["join", "exit"]},
+    {"operation": "nearest_common", "nodes": ["dead", "left"]}
+  ]
+}

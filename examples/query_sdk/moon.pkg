@@ -1,0 +1,6 @@
+import {
+  "Novanke/cairndom" @dom,
+  "moonbitlang/core/json",
+}
+
+pkgtype(kind: "executable")

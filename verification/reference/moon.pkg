@@ -1,0 +1,7 @@
+import {
+  "Novanke/cairndom" @dom,
+}
+
+import {
+  "moonbitlang/core/json",
+} for "wbtest"

@@ -194,6 +194,7 @@ fn validate_dominance(tree : Dominance) -> Unit raise GraphError {
     tree.immediate[tree.root] is Some(_) {
     raise Invalid("invalid dominator root")
   }
+  let frontier_seen = Array::make(n, -1)
   for node in 0..<n {
     if !tree.reachable[node] {
       if tree.immediate[node] is Some(_) || !tree.frontiers[node].is_empty() {
@@ -209,12 +210,14 @@ fn validate_dominance(tree : Dominance) -> Unit raise GraphError {
     if tree.frontiers[node].length() > n {
       raise Invalid("oversized dominance frontier")
     }
-    let members = Array::make(n, false)
     for target in tree.frontiers[node] {
-      if target < 0 || target >= n || !tree.reachable[target] || members[target] {
+      if target < 0 ||
+        target >= n ||
+        !tree.reachable[target] ||
+        frontier_seen[target] == node {
         raise Invalid("invalid or duplicate dominance frontier member")
       }
-      members[target] = true
+      frontier_seen[target] = node
     }
   }
   let state = Array::make(n, 0)

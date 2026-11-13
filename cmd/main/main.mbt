@@ -25,16 +25,28 @@ extern "js" fn set_exit_code(code : Int32) -> Unit =
 
 ///|
 extern "js" fn write_stderr(text : String) -> Unit =
-  #| text => { process.stderr.write(text); }
+  #| text => {
+  #|   try {
+  #|     const fs = process.getBuiltinModule('node:fs');
+  #|     const bytes = new TextEncoder().encode(text);
+  #|     let used = 0;
+  #|     while (used < bytes.length) {
+  #|       const count = fs.writeSync(2, bytes, used, bytes.length - used);
+  #|       if (count <= 0) return;
+  #|       used += count;
+  #|     }
+  #|   } catch {}
+  #| }
 
 ///|
-// The bridge only reads/writes local files. Parsing and analysis stay in MoonBit.
+// The bridge adapts local files and stdout. Parsing and analysis stay in MoonBit.
 extern "js" fn file_io(
   operation : String,
   input : String,
   text : String,
+  stdout_error : (String) -> Unit,
 ) -> IoResult =
-  #| (operation, input, text) => {
+  #| (operation, input, text, stdoutError) => {
   #|   let fs, path, fd, stage, stageId, dataPath, dataId;
   #|   const identity = s => `${process.platform === 'win32' ? 'win' : s.dev}:${s.ino}:${s.birthtimeNs}`;
   #|   const stamp = (s, device = s.dev) => `${device}:${s.ino}:${s.size}:${s.mtimeNs}:${s.ctimeNs}`;
@@ -60,6 +72,28 @@ extern "js" fn file_io(
   #|   };
   #|   try {
   #|     fs = process.getBuiltinModule('node:fs');
+  #|     if (operation === 'stdout') {
+  #|       const bytes = new TextEncoder().encode(text);
+  #|       if (bytes.length > 16777216) throw Error('output exceeds 16 MiB');
+  #|       const output = process.stdout;
+  #|       let reported = false;
+  #|       const fail = error => {
+  #|         if (reported) return;
+  #|         reported = true;
+  #|         stdoutError(String(error.message || error));
+  #|       };
+  #|       const onError = error => fail(error);
+  #|       output.once('error', onError);
+  #|       try {
+  #|         // A false result is backpressure: the stream retains the queued text.
+  #|         output.write(text, error => {
+  #|           // An error callback precedes the error event; keep its listener.
+  #|           if (error) fail(error);
+  #|           else output.removeListener('error', onError);
+  #|         });
+  #|       } catch (error) { fail(error); }
+  #|       return {error:''};
+  #|     }
   #|     path = process.getBuiltinModule('node:path');
   #|     const target = path.resolve(input);
   #|     checkLinks(target, operation === 'write');
@@ -149,7 +183,9 @@ fn io(
   path : String,
   text~ : String = "",
 ) -> String raise CommandError {
-  let result = file_io(operation, path, text)
+  let result = file_io(operation, path, text, detail => {
+    print_error("io", detail)
+  })
   if result.error() != "" {
     raise CommandError("io", result.error())
   }
@@ -166,9 +202,10 @@ priv struct Options {
 
 ///|
 fn parse_options(args : Array[String]) -> Options raise CommandError {
-  if args.is_empty() || (args[0] != "analyze" && args[0] != "plan-ssa") {
+  if args.is_empty() ||
+    (args[0] != "analyze" && args[0] != "plan-ssa" && args[0] != "query") {
     raise CommandError(
-      "usage", "expected analyze or plan-ssa INPUT; run help for usage",
+      "usage", "expected analyze, plan-ssa or query INPUT; run help for usage",
     )
   }
   let mut input : String? = None
@@ -215,9 +252,9 @@ fn parse_options(args : Array[String]) -> Options raise CommandError {
     Some(path) => path
     None => raise CommandError("usage", "missing input path")
   }
-  if args[0] == "plan-ssa" && format == Some("dot") {
+  if args[0] != "analyze" && format == Some("dot") {
     raise CommandError(
-      "usage", "plan-ssa produces JSON; DOT is only available for analyze",
+      "usage", "this command produces JSON; DOT is only available for analyze",
     )
   }
   { command: args[0], input, format: format.unwrap_or("json"), output, }
@@ -227,7 +264,9 @@ fn parse_options(args : Array[String]) -> Options raise CommandError {
 fn execute(args : Array[String]) -> Unit raise {
   let options = parse_options(args)
   let input = io("read", options.input)
-  let rendered = if options.command == "plan-ssa" {
+  let rendered = if options.command == "query" {
+    @cairn.query_json_text(input)
+  } else if options.command == "plan-ssa" {
     @cairn.ssa_plan_json_text(@cairn.parse_program(input))
   } else {
     let graph = @cairn.parse_graph(input)
@@ -244,48 +283,57 @@ fn execute(args : Array[String]) -> Unit raise {
   }
   match options.output {
     Some(path) => ignore(io("write", path, text~))
-    None => println(rendered)
+    None => ignore(io("stdout", "", text~))
   }
 }
 
 ///|
 fn print_error(code : String, detail : String) -> Unit {
+  set_exit_code(2)
   write_stderr(
     Json::object(
       Map([("error", Json::string(code)), ("detail", Json::string(detail))]),
     ).stringify() +
     "\n",
   )
-  set_exit_code(2)
 }
 
 ///|
-fn main {
-  let args = raw_arguments()[:].to_owned()
+fn run_command(args : Array[String]) -> Unit raise {
   let help = ["help", "--help", "-h"]
   if args.is_empty() ||
     (args.length() == 1 && help.contains(args[0])) ||
     (
       args.length() == 2 &&
-      (args[0] == "analyze" || args[0] == "plan-ssa") &&
+      (args[0] == "analyze" || args[0] == "plan-ssa" || args[0] == "query") &&
       help.contains(args[1])
     ) {
-    println(
-      "CairnDom — control-flow graph analysis\n" +
-      "analyze INPUT [--format json|dot] [--out NEW_FILE]\n" +
-      "plan-ssa INPUT [--out NEW_FILE]\n" +
-      "help\n" +
-      "JSON is the default format. Without --out, the result is written to stdout.\n" +
-      "Input must be a regular UTF-8 file of at most 2 MiB. Output is limited to 16 MiB.\n" +
-      "--out publishes a new file through staged hard-link creation; its parent must exist.\n" +
-      "Phi reports contain locations only; callers provide entry values and any IR rewriting.\n" +
-      "Node.js 22.16+ is required. Exit 0 means analysis produced; exit 2 means input or I/O error.",
+    ignore(
+      io(
+        "stdout",
+        "",
+        text="CairnDom — control-flow graph analysis\n" +
+          "analyze INPUT [--format json|dot] [--out NEW_FILE]\n" +
+          "plan-ssa INPUT [--out NEW_FILE]\n" +
+          "query INPUT [--out NEW_FILE]\n" +
+          "help\n" +
+          "JSON is the default format. Without --out, the result is written to stdout.\n" +
+          "Input must be a regular UTF-8 file of at most 2 MiB. Output is limited to 16 MiB.\n" +
+          "--out publishes a new file through staged hard-link creation; its parent must exist.\n" +
+          "Phi reports contain locations only; callers provide entry values and any IR rewriting.\n" +
+          "Node.js 22.16+ is required. Exit 0 means analysis produced; exit 2 means input or I/O error.\n",
+      ),
     )
   } else {
-    execute(args) catch {
-      CommandError(code, detail) => print_error(code, detail)
-      @cairn.Invalid(detail) => print_error("input", detail)
-      _ => print_error("internal", "unexpected execution error")
-    }
+    execute(args)
+  }
+}
+
+///|
+fn main {
+  run_command(raw_arguments()[:].to_owned()) catch {
+    CommandError(code, detail) => print_error(code, detail)
+    @cairn.Invalid(detail) => print_error("input", detail)
+    _ => print_error("internal", "unexpected execution error")
   }
 }
