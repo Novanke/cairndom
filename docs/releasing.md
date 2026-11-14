@@ -6,7 +6,7 @@
    only after verifying the supported entry points. Update the module version
    and the README's exact dependency version together.
 3. Run formatting, public-interface generation, Wasm GC and JavaScript checks
-   and tests, the optimized JavaScript build, both SDK examples on both backends,
+   and tests, the optimized JavaScript build, all three SDK examples on both backends,
    the four Python host entry points: `verify_cli.py`, `verify_ssa_cli.py`,
    `verify_queries.py` and `verify_stdout.py`. The full JS release build includes
    the independent MoonBit reference command used by those entry points.

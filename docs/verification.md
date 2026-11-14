@@ -25,7 +25,7 @@ filesystem limits. Its `--node` and `--cli` arguments allow the same checks agai
 a separately installed registry consumer.
 
 Local verification on Windows with the versions above passed both backend
-checks, all 70 test blocks on each backend, the optimized JavaScript build and
+checks, all 74 test blocks on each backend, the optimized JavaScript build and
 the SDK examples on both backends. The separate graph CLI oracle passed 115 graph cases and 161
 actual process invocations, including maximum graph limits, exact input size,
 partial writes, close failures and a competing output writer. Windows symlink
@@ -89,9 +89,28 @@ batches (425 answers) also matched the original node-removal definitions.
 Python remains the shared host for files, processes, pipes and fault injection.
 Use `--oracle` to select a separately compiled reference command when needed.
 
+The 0.4.0 SDK adds `prepare_ssa` and an opaque `SsaSnapshot`. The previous
+`ssa_plan_json_text(program)` convenience function computed a fresh result, so
+callers could not export the exact plan already inspected without recomputing.
+This is an API usability improvement, not a newly discovered mathematical bug.
+The snapshot retains a single privately owned planning result. `plan()` returns
+deep copies of every nested graph/fact/liveness/placement array, and `json_text()`
+serializes the private result directly through the existing 16 MiB guard. The
+updated SSA SDK example demonstrates inspection, edits to both caller inputs and
+inspection copies, then unchanged export. The JSON schema, CLI output and
+existing planning entry points retain their contracts. Oversized reports remain
+inspectable but cannot be exported; editing an inspection copy does not alter
+the saved computation. Four snapshot regression blocks cover all nested array
+boundaries, independent inspection copies, legacy JSON equality, malformed
+inputs, nonzero entries, unreachable facts and permanent loops. The shared dense
+report regression also verifies that an oversized saved plan remains inspectable
+while JSON export fails explicitly. The 0.4.0 local run passed both backend
+checks/tests, all three SDK examples on both backends, the optimized JS build and
+the four host verification entry points (312 actual CLI invocations). The same
+Windows symlink/POSIX FIFO skips above apply. No runtime speed benchmark is claimed.
+
 Next useful work follows correctness evidence and real consumers. Candidate
-directions include explicit data-dependence inputs for program slicing and an
-exact-snapshot SSA report interface. General source-language/IR parsing,
+directions include explicit data-dependence inputs for program slicing. General source-language/IR parsing,
 instruction ordering, variable renaming and program rewriting require separate
 designs. The current phi planner reports locations and incoming-value needs;
 it does not establish that an executable program has been converted to SSA.

@@ -98,7 +98,12 @@ fn ssa_plan_json_value(plan : SsaPlan) -> Json {
 /// rewriting or variable renaming. Unreachable input facts remain visible but
 /// contribute no liveness or placement results. Output is limited to 16 MiB.
 pub fn ssa_plan_json_text(program : FlowProgram) -> String raise GraphError {
-  let plan = plan_ssa(program)
+  prepare_ssa(program).json_text()
+}
+
+///|
+// Requires the privately owned result of a fresh, valid plan_ssa computation.
+fn bounded_ssa_plan_json_text(plan : SsaPlan) -> String raise GraphError {
   let output = ssa_plan_json_value(plan).stringify(indent=2)
   if output.length() > 16_777_216 {
     raise Invalid("SSA plan JSON exceeds 16 MiB")

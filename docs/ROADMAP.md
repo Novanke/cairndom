@@ -18,12 +18,12 @@
   virtual postdominator exit in an offline JSON report.
 - Verify independent algorithms and portable cases in MoonBit while keeping real
   filesystem, pipe and injected host failures in a shared process adapter.
+- Prepare an owned SSA snapshot, inspect defensive copies, then export the exact
+  saved computation after caller inputs or inspection views have changed.
 
 ## Next candidates
 
 Prioritize observed correctness problems and reproducible consumers. Explicit
-data-dependence inputs could support well-scoped slicing. An exact-snapshot SSA
-report interface could avoid recomputing a plan already inspected by a caller.
-Source-language adapters, instruction
+data-dependence inputs could support well-scoped slicing. Source-language adapters, instruction
 renaming and executable IR transformations need separate contracts and designs.
 No implementation or performance claim is made for these candidates.

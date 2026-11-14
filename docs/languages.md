@@ -5,23 +5,23 @@ in MoonBit and checked on Wasm GC and JavaScript. JavaScript FFI is confined to
 the process/filesystem adapters in the production CLI and verification command.
 Python handles real files, subprocesses, pipes and host fault injection.
 
-The 0.3.0 source snapshot below uses canonical Git blob bytes, not build outputs
+The 0.4.0 source snapshot below uses canonical Git blob bytes, not build outputs
 or working-tree line endings. Comments are included. Generated `.mbti`, JSON
 fixtures and documentation are excluded from source rows.
 
 | Source category | Files | Bytes | Nonblank lines |
 | --- | ---: | ---: | ---: |
-| Production MoonBit, including CLI adapter | 15 | 68,062 | 2,128 |
-| Core MoonBit regression tests | 14 | 91,935 | 2,915 |
-| MoonBit SDK examples | 3 | 2,945 | 94 |
+| Production MoonBit, including CLI adapter | 16 | 70,184 | 2,184 |
+| Core MoonBit regression tests | 15 | 98,159 | 3,095 |
+| MoonBit SDK examples | 3 | 3,419 | 104 |
 | Independent MoonBit verification implementation | 4 | 44,853 | 1,454 |
 | Verification selftests | 1 | 1,068 | 22 |
 | Python host adapter and entry points | 5 | 22,408 | 407 |
 
 For comparison with the repository language bar, exclude examples (which GitHub
-excluded from its 0.2.0 measurement). This leaves 205,918 MoonBit bytes, 22,408
+excluded from its 0.2.0 and 0.3.0 measurements). This leaves 214,264 MoonBit bytes, 22,408
 Python bytes and the 325-byte module manifest that GitHub previously classified
-as AMPL: approximately **90.06% MoonBit by that byte metric**. GitHub can classify
+as AMPL: approximately **90.41% MoonBit by that byte metric**. GitHub can classify
 files differently or update its cached bar later; its public languages API is
 the authority for the displayed value.
 
@@ -31,8 +31,10 @@ Do not interpret the language bar as a claim that every source byte is MoonBit,
 or count tests/reference tools as production functionality. No Linguist overrides
 are used; `.gitattributes` only sets text line endings.
 
-The 0.2.0 public measurement was 125,593 MoonBit bytes, 39,065 Python bytes and
-325 AMPL bytes (76.125% MoonBit). Portable reference mathematics and case
+The 0.3.0 public measurement is 205,918 MoonBit bytes, 22,408 Python bytes and
+325 AMPL bytes (90.06% MoonBit), confirmed by the GitHub languages API on
+2026-11-14 before this update. The 0.2.0 measurement was 125,593 MoonBit bytes,
+39,065 Python bytes and 325 AMPL bytes (76.125% MoonBit). In 0.3.0, portable reference mathematics and case
 definitions were migrated rather than duplicated; the old Python definitions
 were removed from the repository. External migration checks matched 113 graph
 reports, 113 DOT strings, 40 SSA reports and 425 batched-query answers exactly.

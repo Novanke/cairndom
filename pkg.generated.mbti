@@ -34,6 +34,8 @@ pub fn parse_program(String) -> FlowProgram raise GraphError
 
 pub fn plan_ssa(FlowProgram) -> SsaPlan raise GraphError
 
+pub fn prepare_ssa(FlowProgram) -> SsaSnapshot raise GraphError
+
 pub fn program_json_text(FlowProgram) -> String raise GraphError
 
 pub fn query_json_text(String) -> String raise GraphError
@@ -140,6 +142,10 @@ pub(all) struct SsaPlan {
   liveness : Liveness
   placements : Array[PhiPlacement]
 }
+
+type SsaSnapshot
+pub fn SsaSnapshot::json_text(Self) -> String raise GraphError
+pub fn SsaSnapshot::plan(Self) -> SsaPlan
 
 // Type aliases
 

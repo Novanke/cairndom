@@ -217,8 +217,10 @@ test "SSA JSON refuses reports exceeding sixteen MiB" {
       }
     }),
   }
+  let saved = prepare_ssa(program)
+  assert_eq(saved.plan().placements.length(), 320)
   let error = try {
-    ignore(ssa_plan_json_text(program))
+    ignore(saved.json_text())
     "accepted"
   } catch {
     Invalid(message) => message
