@@ -60,10 +60,10 @@ SDK 的 `loop_boundaries(graph)` 为每个自然循环列出进入边、离开�
 ## SDK
 
 ```sh
-moon add Novanke/cairndom@0.4.0
+moon add Novanke/cairndom@0.5.0
 ```
 
-在调用方 `moon.pkg` 中导入 `"Novanke/cairndom" @dom`。可直接构建 `Graph`，或调用 `parse_graph`。核心入口为 `analyze`，也可单独调用 `dominators`。图边使用节点数组索引。
+在调用方 `moon.pkg` 中导入 `"Novanke/cairndom" @dom`。可直接构建 `Graph`，或调用 `parse_graph`。核心入口为 `analyze`，也可单独调用 `dominators` 或 `postdominators`。图边使用节点数组索引。
 
 ```moonbit
 let result = @dom.analyze(graph)
@@ -85,7 +85,18 @@ let common = index.nearest_common([left_index, right_index])
 
 索引按 DFS 区间判断支配，单次为 O(1)；公共支配节点使用倍增祖先表，k 个操作数为 O(k log n)。索引不暴露内部数组，原树之后的修改不会影响已有答案；图变化后需重新分析和建立索引。这是算法复杂度说明，不是运行时间承诺。空集合或含不可达节点的最近公共查询返回 `None`，越界索引始终报错。后支配索引可返回虚拟出口索引。
 
+只需要后支配关系或分支的公共后继区域时，可以直接建立后支配索引：
+
+```moonbit
+let post = @dom.index_dominance(@dom.postdominators(graph))
+let shared_region = post.nearest_common([left_index, right_index])
+```
+
+`postdominators(graph)` 保留完整图校验，但不计算正向支配树、控制依赖、循环或强连通分量。结果与 `analyze(graph).post` 相同，继续采用前述有限出口路径语义。根索引是 `graph.nodes.length()`，数组长度是原节点数加一；没有入口可达的声明出口时，仅虚拟根可达。不可达的出口或前驱不会参与结果。返回数组独立持有数据，可以交给 `index_dominance` 再做多次查询。这里缩小了实际执行的分析范围，不作未经测量的耗时承诺。
+
 文件批量查询使用 `cairndom.queries.v1`：包含 `graph`、`tree`（`forward` 或 `post`）和 `queries`。每项为 `{"operation":"dominates","ancestor":"entry","node":"join"}` 或 `{"operation":"nearest_common","nodes":["left","right"]}`。`query` 命令只建立一次索引；样例中两个分支的最近公共支配节点是 `entry`，`join` 和 `exit` 的是 `join`。JSON 入口也可直接通过 SDK 的 `query_json_text` 调用。
+
+`tree: "post"` 的 SDK JSON 与 CLI 查询现在直接使用 `postdominators`，已有输入格式、输出格式、顺序及边界限制保持兼容；`analyze` 仍返回完整分析。
 
 查询最多 4,096 项、合计 16,384 个操作数，输入 2 MiB，输出 16 MiB。操作数使用原图 ID，支持重复节点和空列表；不接受虚拟出口作为输入 ID。`found: false` 表示没有结果，`found: true` 且 `virtual_exit: true` 表示结果是后支配虚拟出口，二者不能混同。后支配继续采用前述有限出口路径范围。
 

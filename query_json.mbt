@@ -110,7 +110,7 @@ pub fn query_json_text(input : String) -> String raise GraphError {
   let tree = if tree_kind == "forward" {
     dominators(graph)
   } else {
-    analyze(graph).post
+    postdominators(graph)
   }
   let index = index_dominance(tree)
   let answers = []

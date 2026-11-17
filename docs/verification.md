@@ -25,7 +25,7 @@ filesystem limits. Its `--node` and `--cli` arguments allow the same checks agai
 a separately installed registry consumer.
 
 Local verification on Windows with the versions above passed both backend
-checks, all 74 test blocks on each backend, the optimized JavaScript build and
+checks, all 79 test blocks on each backend, the optimized JavaScript build and
 the SDK examples on both backends. The separate graph CLI oracle passed 115 graph cases and 161
 actual process invocations, including maximum graph limits, exact input size,
 partial writes, close failures and a competing output writer. Windows symlink
@@ -109,8 +109,32 @@ checks/tests, all three SDK examples on both backends, the optimized JS build an
 the four host verification entry points (312 actual CLI invocations). The same
 Windows symlink/POSIX FIFO skips above apply. No runtime speed benchmark is claimed.
 
+The 0.5.0 review found no new mathematical error, but post-only named queries
+called `analyze(graph).post`, unnecessarily constructing forward dominators,
+control relations, loops and SCCs. `postdominators(graph)` now validates the full
+graph, traverses entry reachability and computes only the reversed finite-exit
+dominator tree. Full `analyze` shares the same private postdominator helper with
+its existing forward reachability result. The SDK JSON/CLI post-query path uses
+the standalone function. JSON schemas and answers remain unchanged; the query
+SDK example runs the new public entry point. This is a reduction in the work
+selected by the call path, not a measured wall-clock performance claim.
+
+Five postdominance regression blocks compare the standalone tree with an
+independent node-removal definition and the full-analysis result. Exhaustive
+enumeration covers 2,187 three-node graph/root/valid-terminal-exit configurations.
+Focused cases cover nonzero entry, incoming edges, self-loops, permanent cycles,
+unreachable predecessors/exits, absent exits, terminal entry, the 513-slot tree
+for 512 original nodes, independently owned arrays and malformed typed graphs.
+The local 0.5.0 run passed both backend checks and all 79 test blocks per backend,
+all three SDK examples on both backends, the optimized JS build, and the four
+host validators (312 actual CLI invocations). Windows symlink creation and POSIX
+FIFO checks have the previously recorded local skips; public Linux CI must pass
+before publication.
+
 Next useful work follows correctness evidence and real consumers. Candidate
-directions include explicit data-dependence inputs for program slicing. General source-language/IR parsing,
+directions include per-use reaching-definition/incoming-value explanations,
+owned graph report snapshots and explicit data-dependence inputs for program
+slicing. General source-language/IR parsing,
 instruction ordering, variable renaming and program rewriting require separate
 designs. The current phi planner reports locations and incoming-value needs;
 it does not establish that an executable program has been converted to SSA.

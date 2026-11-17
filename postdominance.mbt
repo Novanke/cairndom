@@ -1,0 +1,56 @@
+///|
+// The graph is validated and entry_reachable has one slot per original node.
+// Full analysis already owns this reachability result; standalone queries need
+// only a traversal, not the forward dominator tree or any structural analysis.
+fn compute_postdominance(
+  graph : Graph,
+  entry_reachable : Array[Bool],
+) -> Dominance {
+  let n = graph.nodes.length()
+  let reverse : Array[Array[Int32]] = Array::makei(n + 1, _ => [])
+  let reverse_pred : Array[Array[Int32]] = Array::makei(n + 1, _ => [])
+  for (from, to) in graph.edges {
+    if entry_reachable[from] && entry_reachable[to] {
+      reverse[to].push(from)
+      reverse_pred[from].push(to)
+    }
+  }
+  for exit in graph.exits {
+    if entry_reachable[exit] {
+      reverse[n].push(exit)
+      reverse_pred[exit].push(n)
+    }
+  }
+  compute_dominance(reverse, reverse_pred, n)
+}
+
+///|
+/// Compute postdominance without forward dominators, control dependencies,
+/// loops or SCCs. Scope is finite paths from entry reaching declared terminal
+/// exits, exactly as analyze(graph).post; this is not a termination proof.
+/// The root is the virtual exit at graph.nodes.length(), and all arrays have
+/// one extra slot for it. With no reachable declared exit only that root is
+/// reachable. Returned arrays are independently owned.
+pub fn postdominators(input : Graph) -> Dominance raise GraphError {
+  let graph = snapshot_graph(input)
+  let n = graph.nodes.length()
+  let succ : Array[Array[Int32]] = Array::makei(n, _ => [])
+  for (from, to) in graph.edges {
+    succ[from].push(to)
+  }
+  let reachable = Array::make(n, false)
+  let work = [graph.entry]
+  reachable[graph.entry] = true
+  let mut cursor = 0
+  while cursor < work.length() {
+    let node = work[cursor]
+    cursor += 1
+    for next in succ[node] {
+      if !reachable[next] {
+        reachable[next] = true
+        work.push(next)
+      }
+    }
+  }
+  compute_postdominance(graph, reachable)
+}

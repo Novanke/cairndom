@@ -6,21 +6,7 @@ pub fn analyze(input : Graph) -> Analysis raise GraphError {
   let n = graph.nodes.length()
   let (succ, pred) = adjacency(graph)
   let forward = compute_dominance(succ, pred, graph.entry)
-  let reverse = Array::makei(n + 1, _ => [])
-  let reverse_pred = Array::makei(n + 1, _ => [])
-  for (from, to) in graph.edges {
-    if forward.reachable[from] && forward.reachable[to] {
-      reverse[to].push(from)
-      reverse_pred[from].push(to)
-    }
-  }
-  for exit in graph.exits {
-    if forward.reachable[exit] {
-      reverse[n].push(exit)
-      reverse_pred[exit].push(n)
-    }
-  }
-  let post = compute_dominance(reverse, reverse_pred, n)
+  let post = compute_postdominance(graph, forward.reachable)
   let controls = Array::makei(n, _ => Array::make(n, false))
   for (from, to) in graph.edges {
     if !post.reachable[from] || !post.reachable[to] {

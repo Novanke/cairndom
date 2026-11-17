@@ -15,8 +15,11 @@ fn main raise {
   tree.immediate[1] = Some(2)
   tree.immediate[2] = Some(1)
   assert_eq(index.nearest_common([1, 2]), Some(0))
-  let post = @dom.index_dominance(@dom.analyze(graph).post)
+  let post = @dom.index_dominance(@dom.postdominators(graph))
   assert_eq(post.nearest_common([1, 2]), Some(3))
+  assert_eq(post.root(), graph.nodes.length())
+  assert_true(post.dominates(4, 0))
+  assert_false(post.is_reachable(5))
   let request = Json::object(
     Map([
       ("schema", Json::string("cairndom.queries.v1")),

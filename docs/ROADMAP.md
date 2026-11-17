@@ -20,10 +20,20 @@
   filesystem, pipe and injected host failures in a shared process adapter.
 - Prepare an owned SSA snapshot, inspect defensive copies, then export the exact
   saved computation after caller inputs or inspection views have changed.
+- Query postdominance directly through the SDK or named JSON batches without
+  computing forward dominators, control dependencies, natural loops or SCCs.
 
 ## Next candidates
 
-Prioritize observed correctness problems and reproducible consumers. Explicit
-data-dependence inputs could support well-scoped slicing. Source-language adapters, instruction
-renaming and executable IR transformations need separate contracts and designs.
-No implementation or performance claim is made for these candidates.
+Prioritize observed correctness problems and reproducible consumers. The 0.5.0
+review found no new mathematical bug. It identified three practical directions:
+direct postdominance (now implemented), per-use value origins from existing
+block facts, and owned graph-analysis report snapshots. Per-use origins should
+distinguish definition blocks from caller-supplied incoming values, include
+permanent loops, and bound source/use expansion; they are not implemented yet.
+Owned graph reports could support inspect/edit/export clients, but the current
+mutable Analysis contract still requires valid, unmodified results to serialize.
+Explicit data-dependence inputs could later support well-scoped slicing.
+Source-language adapters, instruction renaming and executable IR transformations
+need separate contracts and designs. No implementation or performance claim is
+made for these candidates.
