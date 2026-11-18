@@ -7,8 +7,8 @@
    and the README's exact dependency version together.
 3. Run formatting, public-interface generation, Wasm GC and JavaScript checks
    and tests, the optimized JavaScript build, all three SDK examples on both backends,
-   the four Python host entry points: `verify_cli.py`, `verify_ssa_cli.py`,
-   `verify_queries.py` and `verify_stdout.py`. The full JS release build includes
+   the five Python host entry points: `verify_cli.py`, `verify_ssa_cli.py`,
+   `verify_queries.py`, `verify_stdout.py` and `verify_value_origins.py`. The full JS release build includes
    the independent MoonBit reference command used by those entry points.
    Record unavailable filesystem capabilities instead of claiming they ran.
 4. Review the actual source diff and commit meaningful complete changes. Push
@@ -23,7 +23,7 @@
 7. Create a new consumer outside this repository with an exact registry version
    dependency and no prior build/cache directory. Run real public-API assertions
    on both backends. Compare the installed original files with the archive and
-   Git commit. Build the installed package's CLI and run all four host entry points
+   Git commit. Build the installed package's CLI and run all five host entry points
    against that installed CLI, including new-file refusal and stdout failures.
 8. After those checks, create and push the matching version tag (prefer annotated).
    If normal Git transport fails, the GitHub release UI may create a tag fixed to

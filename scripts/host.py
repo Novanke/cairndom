@@ -91,7 +91,7 @@ class CliChecks:
     def check_case(self, command, name, value, expected=None):
         path = self.put_graph(name, value)
         if expected is None:
-            expected = self.reference.run({"analyze": "graph", "plan-ssa": "program", "query": "query"}[command], value)
+            expected = self.reference.run({"analyze": "graph", "plan-ssa": "program", "query": "query", "trace-values": "value-origins"}[command], value)
             if command == "analyze":
                 expected = expected["report"]
         actual = json.loads(self.invoke([command, path]))
@@ -110,7 +110,7 @@ class CliChecks:
 
     def reject_cases(self, command):
         for case in self.reference.run("query-invalid-cases" if command == "query" else "invalid-cases"):
-            if case["command"] == command:
+            if case["command"] == ("plan-ssa" if command == "trace-values" else command):
                 self.reject(case["name"], case["payload"], command)
 
     def bad_arguments(self, command, path):

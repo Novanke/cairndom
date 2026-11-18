@@ -22,17 +22,22 @@
   saved computation after caller inputs or inspection views have changed.
 - Query postdominance directly through the SDK or named JSON batches without
   computing forward dominators, control dependencies, natural loops or SCCs.
+- Explain each reachable block-variable use with its possible last-definition
+  blocks and incoming-value requirement, retain an owned SDK result, and export
+  the same complete named report through `trace-values` without overwriting files.
 
 ## Next candidates
 
-Prioritize observed correctness problems and reproducible consumers. The 0.5.0
-review found no new mathematical bug. It identified three practical directions:
-direct postdominance (now implemented), per-use value origins from existing
-block facts, and owned graph-analysis report snapshots. Per-use origins should
-distinguish definition blocks from caller-supplied incoming values, include
-permanent loops, and bound source/use expansion; they are not implemented yet.
+Prioritize observed correctness problems and reproducible consumers. The 0.6.0
+review found no new confirmed mathematical bug. It considered per-use value
+origins (now implemented), owned graph reports and safe abandoned-stage cleanup.
 Owned graph reports could support inspect/edit/export clients, but the current
 mutable Analysis contract still requires valid, unmodified results to serialize.
+Safe cleanup of abandoned `.cairndom-*` stages needs explicit ownership markers;
+the current CLI discloses possible leftovers and does not blindly delete them.
+Value origins describe possible sources under the block-use convention, without
+source-language, path-feasibility or alias reasoning. They do not classify an
+incoming value as an initialization error or provide IR transformations.
 Explicit data-dependence inputs could later support well-scoped slicing.
 Source-language adapters, instruction renaming and executable IR transformations
 need separate contracts and designs. No implementation or performance claim is

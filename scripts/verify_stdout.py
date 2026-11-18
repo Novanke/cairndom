@@ -97,6 +97,7 @@ def main():
 
         for name, command in [("analyze", ["analyze", graph_path]),
                               ("plan-ssa", ["plan-ssa", program_path]),
+                              ("trace-values", ["trace-values", program_path]),
                               ("query", ["query", query_path]),
                               ("help", ["--help"])]:
             code, expected, stderr = invoke(node, cli, command)
@@ -107,7 +108,7 @@ def main():
                 require(b"analyze INPUT" in expected, "help text is missing")
             else:
                 require(json.loads(expected)["schema"] == {
-                    "analyze": "cairndom.analysis.v1", "plan-ssa": "cairndom.ssa-plan.v1", "query": "cairndom.answers.v1"}[name],
+                    "analyze": "cairndom.analysis.v1", "plan-ssa": "cairndom.ssa-plan.v1", "query": "cairndom.answers.v1", "trace-values": "cairndom.value-origins.v1"}[name],
                     f"{name}: normal report schema is wrong")
             require_io_error(invoke(node, cli, command, close_stdout=True), name + " closed stdout")
             code, stdout, stderr = invoke(node, cli, command, close_stdout=True, close_stderr=True)

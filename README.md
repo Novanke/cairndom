@@ -1,6 +1,6 @@
 # CairnDom
 
-CairnDom 是纯 MoonBit 控制流图分析基础库，提供支配树、支配边界、后支配关系、控制依赖、自然循环、强连通分量、变量活跃性和 SSA 候选位置规划。它可以作为编译器、静态分析器及图工具的公共算法组件。命令行工具直接读取语言无关的图文件，生成可供人工核对或程序消费的 JSON 与 DOT。
+CairnDom 是纯 MoonBit 控制流图分析基础库，提供支配树、支配边界、后支配关系、控制依赖、自然循环、强连通分量、变量活跃性、按使用点的值来源解释和 SSA 候选位置规划。它可以作为编译器、静态分析器及图工具的公共算法组件。命令行工具直接读取语言无关的图文件，生成可供人工核对或程序消费的 JSON 与 DOT。
 
 例如，图中的两个分支分别定义一个变量，SDK 可根据迭代支配边界找出 SSA 的 phi 候选位置。CLI 则直接指出分支汇合点、循环头、回边来源、不可达节点，以及哪些可达节点没有到达声明出口的路径。
 
@@ -15,11 +15,15 @@ node _build/js/release/build/cmd/main/main.js analyze examples/branch-loop.json 
 node _build/js/release/build/cmd/main/main.js plan-ssa examples/ssa-branch.json
 node _build/js/release/build/cmd/main/main.js plan-ssa examples/ssa-branch.json --out phi-plan.json
 node _build/js/release/build/cmd/main/main.js query examples/queries.json
+node _build/js/release/build/cmd/main/main.js trace-values examples/value-origins.json
+node _build/js/release/build/cmd/main/main.js trace-values examples/value-origins.json --out value-origins.json
 ```
 
 样例报告中，`left` 和 `right` 的支配边界都是 `join`，`head` 与 `body` 形成一个以 `head` 为头的自然循环，`dead` 不可达。蓝色虚线 DOT 边是直接支配关系，普通边保留原始控制流。DOT 是图描述文件，可由支持该格式的工具进一步渲染。
 
 `plan-ssa` 的样例中，两个分支定义 `value` 与 `unused`，汇合块仅使用 `value` 和 `parameter`。输出会为 `value` 在 `join` 安排候选，为未使用的 `unused` 删除候选，并将 `parameter` 列入 `entry_values_required`。报告的 `status` 为 `locations_only`，其中同时给出各块活跃集合和按变量分组的候选；不会生成重命名后的指令或可执行程序。该命令只输出 JSON，并复用相同的输入校验与新文件独占发布约定。
+
+`trace-values` 读取同一 `cairndom.program.v1` 格式，解释每个可达使用点的可能来源。新样例中只有 `left` 分支定义 `value`，因此 `join` 的使用既可能来自 `left`，也可能需要原始入口值；`parameter` 需要调用方提供入口值。`join` 随后定义 `value`，所以 `tail` 的使用只来自 `join`。`dead` 被列入不可达块，不参与来源。这可以帮助分析器定位需要参数或初值的具体使用块。
 
 不传 `--out` 时结果写 stdout。错误为 stderr 上的 JSON，退出码 2。退出码 0 表示成功生成分析，图中仍可能存在不可达节点、多入口循环或无法到达出口的节点。
 
@@ -60,7 +64,7 @@ SDK 的 `loop_boundaries(graph)` 为每个自然循环列出进入边、离开�
 ## SDK
 
 ```sh
-moon add Novanke/cairndom@0.5.0
+moon add Novanke/cairndom@0.6.0
 ```
 
 在调用方 `moon.pkg` 中导入 `"Novanke/cairndom" @dom`。可直接构建 `Graph`，或调用 `parse_graph`。核心入口为 `analyze`，也可单独调用 `dominators` 或 `postdominators`。图边使用节点数组索引。
@@ -132,6 +136,21 @@ let report = saved.json_text()
 
 `ssa_plan_json_text(program)` 仍是按当前程序即时计算并导出的便捷入口。快照用于保存已查看的结果，不用于导出对检查副本所做的修改；图或变量事实改变后，需要新的规划时应重新调用 `prepare_ssa`。快照是进程内对象，JSON 报告没有新增反序列化为规划对象的接口。完整的 `examples/ssa_sdk` 会修改原始输入与检查副本，再断言已保存的报告保持一致。
 
+按使用点查看可能的最后定义块和入口值，可使用独立的值来源分析：
+
+```moonbit
+let origins = @dom.trace_values(program)
+let uses = origins.uses()
+let saved_program = origins.program()
+let report = origins.json_text()
+```
+
+每个 `UseOrigins` 包含使用块索引 `node`、变量索引 `variable`、排序后的来源块 `definitions` 和 `requires_entry_value`。结果按块和变量索引排序，索引对应 `origins.program()` 的原始节点与变量顺序。`program()` 和 `uses()` 都返回独立可修改的副本；修改输入或副本，不会改变已保存结果及其 JSON。`is_reachable(node)` 可区分不可达块与没有使用的可达块，越界索引报错。
+
+来源沿所有入口可达路径计算，包含永久循环；声明出口不会裁掉这些路径。同一块的使用发生在本地定义之前，但本块上一轮循环的定义可以成为来源。后续定义会阻断更早定义。`requires_entry_value` 表示原始入口值可能到达这个使用点，调用方应提供参数或初值，或按自身语言规则处理；它不直接证明源程序存在未初始化错误。这里不分析值、分支条件、别名或语句顺序，也不转换 IR。
+
+总来源关系上限为 **65,536**，每个使用点的入口值标志也计作一条关系；超过上限整体报错，不返回截断结果。每个使用点的反向搜索使用 O(n) 临时空间，工作量为 O(n + e)，另需存储完整结果；不承诺未经测量的耗时。JSON 为 `cairndom.value-origins.v1`，包括 `uses`、`unreachable_blocks`、`source_relation_count` 和 `source_relation_limit`，输出仍限制为 16 MiB。CLI 沿用新文件独占发布约定，分析失败时不会留下半份目标报告。
+
 完整示例会执行断言并输出分析与 phi 候选点。
 
 ```sh
@@ -156,11 +175,12 @@ python scripts/verify_cli.py
 python scripts/verify_ssa_cli.py
 python scripts/verify_queries.py
 python scripts/verify_stdout.py
+python scripts/verify_value_origins.py
 ```
 
 独立核对方法、复现结果及后续方向见 [验证记录](docs/verification.md)。CI 在 Windows/Linux 上执行双后端检查、测试、示例和真实文件核对。
 
-独立的节点删除、集合方程和用例生成位于 MoonBit 的 `verification/reference`，不调用生产分析算法生成预期答案。Python 只负责真实文件、进程、管道及故障注入适配；三个文件验证入口共享同一输出契约。`moon build --target js --release` 同时构建参考命令，验证脚本也接受 `--oracle` 指定它的位置。生产库、测试、独立验证器与主机适配的语言统计分别记录在 [语言构成说明](docs/languages.md)。
+独立的节点删除、集合方程、正向定义来源状态遍历和用例生成位于 MoonBit 的 `verification/reference`，不调用生产分析算法生成预期答案。Python 只负责真实文件、进程、管道及故障注入适配；四个文件验证入口共享同一输出契约，另有标准输出验证入口。`moon build --target js --release` 同时构建参考命令，验证脚本也接受 `--oracle` 指定它的位置。生产库、测试、独立验证器与主机适配的语言统计分别记录在 [语言构成说明](docs/languages.md)。
 
 ## 算法与来源
 

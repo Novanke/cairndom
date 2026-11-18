@@ -67,6 +67,9 @@ fn run() -> Json raise {
     "query" => @reference.query_expected(source())
     "query-cases" => @reference.query_cases()
     "query-invalid-cases" => @reference.query_invalid_cases()
+    "value-origins" => @reference.value_origins_expected(source())
+    "value-origins-cases" => @reference.value_origins_cases()
+    "value-origin-limit-cases" => @reference.value_origin_limit_cases()
     _ => fail("unknown reference command")
   }
 }

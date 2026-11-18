@@ -25,7 +25,7 @@ filesystem limits. Its `--node` and `--cli` arguments allow the same checks agai
 a separately installed registry consumer.
 
 Local verification on Windows with the versions above passed both backend
-checks, all 79 test blocks on each backend, the optimized JavaScript build and
+checks, all 84 test blocks on each backend, the optimized JavaScript build and
 the SDK examples on both backends. The separate graph CLI oracle passed 115 graph cases and 161
 actual process invocations, including maximum graph limits, exact input size,
 partial writes, close failures and a competing output writer. Windows symlink
@@ -58,7 +58,7 @@ results. Analysis JSON can retain a bounded witness prefix but explicitly marks
 `plan-ssa` command, independently calculating liveness and pruned phi closure,
 and exercising input/format errors and non-overwriting publication. Both scripts
 support `--node` and `--cli` for verification of a separately installed package.
-The local Windows run passed 42 program oracle cases and 77 real invocations,
+The latest local Windows run passed 43 program oracle cases and 78 real invocations,
 including Unicode/space paths, input preservation, an existing destination and
 an injected partial output write. This is a file-to-report workflow; no IR
 conversion or source-language semantics are inferred.
@@ -73,7 +73,7 @@ cases passed 44 invocations against node-removal/set-intersection references.
 Stdout previously used console logging, which could swallow a closed-pipe error
 and exit successfully. The stream adapter now observes callbacks/error events,
 handles backpressure and routes failures through the MoonBit JSON diagnostic.
-Thirty real invocations cover analyze/plan-ssa/query/help, closed stdout/stderr,
+Thirty-seven real invocations cover analyze/plan-ssa/query/trace-values/help, closed stdout/stderr,
 callback and event failures, synchronous throws, and an independently consumed
 3,504,328-byte report with a slow reader. Partial stdout bytes cannot be rolled
 back; the atomic new-file convention applies to `--out` only. The bridge follows
@@ -131,9 +131,47 @@ host validators (312 actual CLI invocations). Windows symlink creation and POSIX
 FIFO checks have the previously recorded local skips; public Linux CI must pass
 before publication.
 
+The 0.6.0 review considered per-use value origins, owned analysis reports and
+safe cleanup of abandoned output stages, with no new confirmed math bug. The
+selected API gap was that `requires_entry_value` only described a variable-wide
+SSA requirement; a caller could not identify each affected use or its possible
+last-definition blocks. `trace_values` now explains those uses under the existing
+FlowProgram convention. It searches backwards from each use, stopping at local
+definitions, while treating an entry value and loop-carried definitions as
+separate possible sources. Permanent loops participate and unreachable facts
+are validated but excluded. The opaque result owns its program and returns deep
+copies, so inspection edits cannot alter its saved JSON report.
+
+Five regression blocks use an independent forward `(block, last source)` state
+walk, recording uses before replacing a local definition. They check all 12,288
+three-node graph/root/definition-subset configurations, focused branches and
+overwrites, entry backedges, self-use/definition loops, permanent cycles,
+unreachable facts, sorted output, ownership, empty variables and malformed inputs.
+Exactly 65,536 source relations are accepted, including incoming-value tokens;
+one additional token rejects the entire computation. The CLI capacity check
+publishes the exact-limit result and verifies that the overflow creates no file.
+
+The independent real-file reference now checks `trace-values` using forward
+source states rather than the production backward search. It uses production
+types/parsers only, not production trace/liveness/SSA algorithms. The new sample
+shows a partially defined branch, caller-supplied parameter, overwrite and
+unreachable block. `examples/ssa_sdk` also checks inspection/export ownership.
+The named report states `possible_origins`, not a source-language initialization
+proof; it does not solve path feasibility, aliases or statement ordering.
+
+Local 0.6.0 verification passed both backend checks and all 84 test blocks per
+backend, the optimized JS build, all three SDK examples on both backends and all
+five host validators. These passed 115 graph cases / 161 CLI invocations,
+43 SSA cases / 78 invocations, 12 query cases / 44 invocations, 37 stdout
+invocations and 46 value-origin cases / 84 invocations, for 404 real CLI calls.
+The value-origin validator includes Unicode/space paths, argument/input errors,
+existing-output/input preservation, partial staged writes and both relation
+capacity boundaries. The documented Windows symlink/POSIX FIFO skips remain;
+the matching public Linux job is required before publication.
+
 Next useful work follows correctness evidence and real consumers. Candidate
-directions include per-use reaching-definition/incoming-value explanations,
-owned graph report snapshots and explicit data-dependence inputs for program
+directions include owned graph report snapshots, safe stage ownership/cleanup
+and explicit data-dependence inputs for program
 slicing. General source-language/IR parsing,
 instruction ordering, variable renaming and program rewriting require separate
 designs. The current phi planner reports locations and incoming-value needs;

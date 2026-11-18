@@ -16,6 +16,17 @@ fn main raise {
   assert_eq(plan.placements[0].phi_nodes, [3])
   assert_eq(plan.placements[1].phi_nodes, [])
   assert_true(plan.placements[2].requires_entry_value)
+  let origins = @dom.trace_values(program)
+  let uses = origins.uses()
+  assert_eq(uses.length(), 2)
+  assert_eq(uses[0].node, 3)
+  assert_eq(uses[0].variable, 0)
+  assert_eq(uses[0].definitions, [1, 2])
+  assert_false(uses[0].requires_entry_value)
+  assert_eq(uses[1].variable, 2)
+  assert_eq(uses[1].definitions, [])
+  assert_true(uses[1].requires_entry_value)
+  let origin_report = origins.json_text()
   assert_eq(
     @dom.parse_program(@dom.program_json_text(program)).variables,
     program.variables,
@@ -37,5 +48,8 @@ fn main raise {
   assert_eq(saved.plan().placements[0].phi_nodes, [3])
   assert_true(saved.plan().placements[2].requires_entry_value)
   assert_eq(saved.json_text(), report)
+  uses[0].definitions.clear()
+  assert_eq(origins.uses()[0].definitions, [1, 2])
+  assert_eq(origins.json_text(), origin_report)
   println(report)
 }

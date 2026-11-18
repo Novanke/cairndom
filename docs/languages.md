@@ -5,23 +5,23 @@ in MoonBit and checked on Wasm GC and JavaScript. JavaScript FFI is confined to
 the process/filesystem adapters in the production CLI and verification command.
 Python handles real files, subprocesses, pipes and host fault injection.
 
-The 0.5.0 source snapshot below uses canonical Git blob bytes, not build outputs
+The 0.6.0 source snapshot below uses canonical Git blob bytes, not build outputs
 or working-tree line endings. Comments are included. Generated `.mbti`, JSON
 fixtures and documentation are excluded from source rows.
 
 | Source category | Files | Bytes | Nonblank lines |
 | --- | ---: | ---: | ---: |
-| Production MoonBit, including CLI adapter | 17 | 71,720 | 2,225 |
-| Core MoonBit regression tests | 16 | 105,551 | 3,336 |
-| MoonBit SDK examples | 3 | 3,541 | 107 |
-| Independent MoonBit verification implementation | 4 | 44,853 | 1,454 |
+| Production MoonBit, including CLI adapter | 19 | 79,783 | 2,466 |
+| Core MoonBit regression tests | 17 | 116,149 | 3,684 |
+| MoonBit SDK examples | 3 | 4,075 | 121 |
+| Independent MoonBit verification implementation | 5 | 51,075 | 1,645 |
 | Verification selftests | 1 | 1,068 | 22 |
-| Python host adapter and entry points | 5 | 22,408 | 407 |
+| Python host adapter and entry points | 6 | 24,260 | 436 |
 
 For comparison with the repository language bar, exclude examples (which GitHub
-excluded from its 0.2.0 through 0.4.0 measurements). This leaves 223,192 MoonBit bytes, 22,408
+excluded from its 0.2.0 through 0.5.0 measurements). This leaves 248,075 MoonBit bytes, 24,260
 Python bytes and the 325-byte module manifest that GitHub previously classified
-as AMPL: approximately **90.76% MoonBit by that byte metric**. GitHub can classify
+as AMPL: approximately **90.98% MoonBit by that byte metric**. GitHub can classify
 files differently or update its cached bar later; its public languages API is
 the authority for the displayed value.
 
@@ -31,7 +31,9 @@ Do not interpret the language bar as a claim that every source byte is MoonBit,
 or count tests/reference tools as production functionality. No Linguist overrides
 are used; `.gitattributes` only sets text line endings.
 
-The 0.4.0 public measurement is 214,264 MoonBit bytes, 22,408 Python bytes and
+The 0.5.0 public measurement is 223,192 MoonBit bytes, 22,408 Python bytes and
+325 AMPL bytes (90.76% MoonBit), confirmed on 2026-11-18 before this update.
+The 0.4.0 public measurement was 214,264 MoonBit bytes, 22,408 Python bytes and
 325 AMPL bytes (90.41% MoonBit), confirmed on 2026-11-17 before this update.
 The 0.3.0 public measurement was 205,918 MoonBit bytes, 22,408 Python bytes and
 325 AMPL bytes (90.06% MoonBit), confirmed by the GitHub languages API on

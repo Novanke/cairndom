@@ -605,6 +605,7 @@ pub fn host_cases() -> Json {
         ),
         ("plan-ssa", json_arguments("plan-ssa")),
         ("query", json_arguments("query")),
+        ("trace-values", json_arguments("trace-values")),
       ]),
     ),
   ])

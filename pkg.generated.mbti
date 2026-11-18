@@ -44,6 +44,8 @@ pub fn query_json_text(String) -> String raise GraphError
 
 pub fn ssa_plan_json_text(FlowProgram) -> String raise GraphError
 
+pub fn trace_values(FlowProgram) -> ValueOrigins raise GraphError
+
 // Errors
 #derive(@debug.Debug)
 pub(all) suberror GraphError {
@@ -148,6 +150,23 @@ pub(all) struct SsaPlan {
 type SsaSnapshot
 pub fn SsaSnapshot::json_text(Self) -> String raise GraphError
 pub fn SsaSnapshot::plan(Self) -> SsaPlan
+
+#derive(Eq, @debug.Debug)
+pub(all) struct UseOrigins {
+  node : Int32
+  variable : Int32
+  definitions : Array[Int32]
+  requires_entry_value : Bool
+}
+pub fn UseOrigins::equal(Self, Self) -> Bool
+pub fn UseOrigins::not_equal(Self, Self) -> Bool
+pub fn UseOrigins::to_repr(Self) -> @debug.Repr
+
+type ValueOrigins
+pub fn ValueOrigins::is_reachable(Self, Int32) -> Bool raise GraphError
+pub fn ValueOrigins::json_text(Self) -> String raise GraphError
+pub fn ValueOrigins::program(Self) -> FlowProgram
+pub fn ValueOrigins::uses(Self) -> Array[UseOrigins]
 
 // Type aliases
 

@@ -203,9 +203,14 @@ priv struct Options {
 ///|
 fn parse_options(args : Array[String]) -> Options raise CommandError {
   if args.is_empty() ||
-    (args[0] != "analyze" && args[0] != "plan-ssa" && args[0] != "query") {
+    (
+      args[0] != "analyze" &&
+      args[0] != "plan-ssa" &&
+      args[0] != "query" &&
+      args[0] != "trace-values"
+    ) {
     raise CommandError(
-      "usage", "expected analyze, plan-ssa or query INPUT; run help for usage",
+      "usage", "expected analyze, plan-ssa, query or trace-values INPUT; run help for usage",
     )
   }
   let mut input : String? = None
@@ -268,6 +273,8 @@ fn execute(args : Array[String]) -> Unit raise {
     @cairn.query_json_text(input)
   } else if options.command == "plan-ssa" {
     @cairn.ssa_plan_json_text(@cairn.parse_program(input))
+  } else if options.command == "trace-values" {
+    @cairn.trace_values(@cairn.parse_program(input)).json_text()
   } else {
     let graph = @cairn.parse_graph(input)
     let analysis = @cairn.analyze(graph)
@@ -305,7 +312,12 @@ fn run_command(args : Array[String]) -> Unit raise {
     (args.length() == 1 && help.contains(args[0])) ||
     (
       args.length() == 2 &&
-      (args[0] == "analyze" || args[0] == "plan-ssa" || args[0] == "query") &&
+      (
+        args[0] == "analyze" ||
+        args[0] == "plan-ssa" ||
+        args[0] == "query" ||
+        args[0] == "trace-values"
+      ) &&
       help.contains(args[1])
     ) {
     ignore(
@@ -316,11 +328,13 @@ fn run_command(args : Array[String]) -> Unit raise {
           "analyze INPUT [--format json|dot] [--out NEW_FILE]\n" +
           "plan-ssa INPUT [--out NEW_FILE]\n" +
           "query INPUT [--out NEW_FILE]\n" +
+          "trace-values INPUT [--out NEW_FILE]\n" +
           "help\n" +
           "JSON is the default format. Without --out, the result is written to stdout.\n" +
           "Input must be a regular UTF-8 file of at most 2 MiB. Output is limited to 16 MiB.\n" +
           "--out publishes a new file through staged hard-link creation; its parent must exist.\n" +
           "Phi reports contain locations only; callers provide entry values and any IR rewriting.\n" +
+          "Value origins describe possible last definitions and caller-supplied incoming values.\n" +
           "Node.js 22.16+ is required. Exit 0 means analysis produced; exit 2 means input or I/O error.\n",
       ),
     )

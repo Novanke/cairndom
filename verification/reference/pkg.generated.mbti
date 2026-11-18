@@ -25,6 +25,12 @@ pub fn query_expected(@json.Json) -> @json.Json raise @cairndom.GraphError
 
 pub fn query_invalid_cases() -> @json.Json
 
+pub fn value_origin_limit_cases() -> @json.Json
+
+pub fn value_origins_cases() -> @json.Json raise @cairndom.GraphError
+
+pub fn value_origins_expected(@json.Json) -> @json.Json raise @cairndom.GraphError
+
 // Errors
 
 // Types and methods

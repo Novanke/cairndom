@@ -51,3 +51,4 @@ jobs:
           python scripts/verify_ssa_cli.py
           python scripts/verify_queries.py
           python scripts/verify_stdout.py
+          python scripts/verify_value_origins.py
