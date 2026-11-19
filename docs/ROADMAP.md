@@ -30,14 +30,17 @@
 - Export a distinct node-level JSON summary without building edge witnesses.
 - Check the complete JSON byte budget as snapshot and CLI reports are
   serialized. Preserve legacy report layout and witness metadata.
+- Compare actual device and inode identity before and after reads on POSIX.
+  Inspect same-parent report stage candidates and their filesystem metadata
+  through the read-only `inspect-stages` command.
 
 ## Next candidates
 
 Prioritize observed correctness problems and reproducible consumers.
 
-1. **File identity and recovery.** Review platform-specific file identity checks
-   and design read-only discovery of abandoned stages before considering an
-   ownership protocol for cleanup. The current scope is trusted local directories.
+1. **Stage ownership.** Evaluate an ownership and activity protocol before
+   considering cleanup. Existing stage observations describe the filesystem
+   at scan time in a trusted local directory.
 2. **Cost of narrow queries.** Loop-boundary and edge-witness callers still run
    full analysis. Evaluate dedicated paths and check result parity before any
    performance claim.

@@ -18,6 +18,7 @@ node _build/js/release/build/cmd/main/main.js plan-ssa examples/ssa-branch.json 
 node _build/js/release/build/cmd/main/main.js query examples/queries.json
 node _build/js/release/build/cmd/main/main.js trace-values examples/value-origins.json
 node _build/js/release/build/cmd/main/main.js trace-values examples/value-origins.json --out value-origins.json
+node _build/js/release/build/cmd/main/main.js inspect-stages .
 ```
 
 样例报告中，`left` 和 `right` 的支配边界都是 `join`，`head` 与 `body` 形成一个以 `head` 为头的自然循环，`dead` 不可达。蓝色虚线 DOT 边是直接支配关系，普通边保留原始控制流。DOT 是图描述文件，可由支持该格式的工具进一步渲染。
@@ -30,7 +31,14 @@ node _build/js/release/build/cmd/main/main.js trace-values examples/value-origin
 
 标准输出处理写入回调、背压和流错误；写出时接收端已关闭等可观测 I/O 故障返回 2。失败之前可能已写出报告前缀，管道输出不具有 `--out` 新文件发布的原子性。标准错误也无法写入时仍保留退出码 2。
 
-`--out` 的目标必须是新文件，父目录须已存在且支持硬链接。完整报告先写入同目录暂存区并同步，再独占发布，拒绝覆盖输入及已有文件。中断或清理失败可能留下 `.cairndom-*` 暂存目录。文件操作面向可信本地目录，时间与身份复查提供顺序观测。
+`--out` 的目标必须是新文件，父目录须已存在且支持硬链接。完整报告先写入同目录暂存区并同步，再独占发布，拒绝覆盖输入及已有文件。中断或清理失败可能留下 `.cairndom-*` 暂存目录。文件操作面向可信本地目录。POSIX 读取输入文件时，打开前后的路径和文件描述符必须有一致的设备号、inode、大小及修改时间等身份信息。Windows 的路径与句柄可能报告不同口径的设备号，描述符比较沿用兼容处理，路径仍检查实际设备号。
+
+报告写入中断后，可运行 `inspect-stages DIRECTORY` 检查原输出文件的父目录。命令仅检查该目录的直接子项，最多扫描 4,096 项，识别名称为 `.cairndom-` 加六位 ASCII 字母或数字的候选，按名称排序，将 `cairndom.stage-inspection.v1` JSON 写到 stdout。以短横线开头的目录名可以写作 `inspect-stages -- DIRECTORY`。
+
+- `empty` 表示空目录，`data_only` 表示只有一个链接数为一的普通 `data` 文件，`data_with_other_links` 表示该文件还有其他硬链接。这三种状态的 `possible_residue` 为 `true`。
+- 候选若不是目录、含有额外或异常内容、是符号链接、在扫描中变化或无法读取，分别报告 `not_directory`、`unexpected_contents`、`symbolic_link`、`changed` 或 `unreadable`。符号链接形式的扫描目录或祖先路径会报错。
+
+扫描只读取目录项和文件元数据。报告中的 `ownership` 为 `unverified`，`activity` 为 `unknown`。额外硬链接仅说明文件还有其他目录项，文件是否已经发布需要另行核对。这是面向可信本地目录的顺序观测，供人工排查中断残留。
 
 ## 输入与分析语义
 
@@ -67,7 +75,7 @@ SDK 的 `loop_boundaries(graph)` 为每个自然循环列出进入边、离开�
 ## SDK
 
 ```sh
-moon add Novanke/cairndom@0.8.1
+moon add Novanke/cairndom@0.8.2
 ```
 
 在调用方 `moon.pkg` 中导入 `"Novanke/cairndom" @dom`。可直接构建 `Graph`，或调用 `parse_graph`。核心入口为 `analyze`，也可单独调用 `dominators` 或 `postdominators`。图边使用节点数组索引。

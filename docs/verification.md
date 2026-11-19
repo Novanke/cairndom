@@ -227,6 +227,27 @@ fell from 179.2 to 68.5 MiB. On the existing large valid stdout fixture it fell
 from 75.6 to 68.8 MiB. In those runs both versions produced identical stdout,
 stderr and exit status. These figures describe the two fixtures and host.
 
+In 0.8.2 POSIX input reads compare the descriptor's actual device number
+as part of both identity checks, before and after reading. The real-file
+validator injects a single device-number difference at each observation.
+POSIX must reject it with the corresponding I/O diagnostic. The Windows
+case must produce the same analysis under the existing device compatibility
+rule.
+
+The `inspect-stages` validator interrupts a subprocess immediately before
+publication, observes the surviving staged data file and missing output, and
+checks empty and extra-hard-link cases in the same scratch directory. The
+expected JSON comes from the MoonBit reference command. The test also checks
+that the original staged bytes, existing output, and its hard link survive
+inspection, that unrelated directories are skipped, and that `--out` is
+rejected. The scan is bounded to 4,096 direct entries of a trusted local
+directory. It reads metadata only. Ownership and writer activity are unknown.
+
+With moonc 0.10.20+65efd5b93 and Node 22.16.0, the 0.8.2 and 0.8.1
+optimized CLIs matched stdout, stderr, and exit status for 119 comparisons.
+These covered 113 oracle graphs, four default CLI examples, DOT, and a
+node-level JSON summary.
+
 Next useful work follows correctness evidence and real consumers. Candidate
 directions include safe stage ownership/cleanup and explicit data-dependence inputs for program
 slicing. General source-language/IR parsing,

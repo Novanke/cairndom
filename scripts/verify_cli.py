@@ -2,8 +2,9 @@
 """Exercise real graph files; independent algorithms and cases run in MoonBit."""
 import json
 import os
-import subprocess
-from host import ROOT, diagnostic, require, run_checks
+import tempfile
+from pathlib import Path
+from host import ROOT, require, run_checks
 
 INPUT_LIMIT = 2_097_152
 
@@ -25,6 +26,8 @@ def verify_formats_and_errors(checks):
     graph = fixtures["graph"]
     path, out, original, stdout = checks.file_contract("analyze", "file with spaces 汉字", graph)
     report = json.loads(stdout)
+    verify_input_device(checks, path, report)
+    verify_stage_inspection(checks, path)
     expected_summary = report.copy()
     expected_summary["schema"] = "cairndom.analysis-summary.v1"
     for field in ("control_witnesses", "control_witnesses_complete", "control_witness_limit"):
@@ -65,6 +68,7 @@ def verify_formats_and_errors(checks):
         directory_link.symlink_to(checks.work, target_is_directory=True)
         checks.invoke(["analyze", directory_link / path.name], error=True)
         checks.invoke(["analyze", path, "--out", directory_link / "never.json"], error=True)
+        checks.invoke(["inspect-stages", directory_link], error=True)
         require(not (checks.work / "never.json").exists(), "symlink parent allowed output publication")
         require(path.read_bytes() == original and json.loads(out.read_text(encoding="utf-8")) == report,
                 "symlink error changed a target")
@@ -126,18 +130,67 @@ def verify_analysis_output_limit(checks):
     existing.write_bytes(b"keep this output\n")
     before = set(checks.work.rglob("*"))
     for options in ([], ["--out", unopened], ["--out", existing]):
-        result = subprocess.run([checks.node, str(checks.cli), "analyze", str(path), *map(str, options)],
-                                cwd=checks.work, capture_output=True, timeout=30)
-        checks.calls += 1
-        require(result.returncode == 2 and not result.stdout, "oversized analysis did not fail cleanly")
-        require(diagnostic(result.stderr) == {"error": "limit", "detail": "output exceeds 16 MiB"},
-                "oversized analysis changed the limit diagnostic")
+        checks.invoke(["analyze", path, *options], error={"error": "limit", "detail": "output exceeds 16 MiB"})
         require(set(checks.work.rglob("*")) == before and existing.read_bytes() == b"keep this output\n",
                 "oversized analysis created a target or stage, or changed existing output")
     summary = json.loads(checks.invoke(["analyze", path, "--format", "json-summary"]))
     require(summary["schema"] == "cairndom.analysis-summary.v1" and
             summary["nodes"][49]["control_dependencies"] == controllers,
             "summary lost node-level control dependencies for the oversized analysis")
+
+
+def verify_input_device(checks, path, report):
+    for phase, moment in enumerate(("before", "during"), 1):
+        preload = checks.failure_preload("descriptor-" + moment, f"""
+const open = fs.openSync, stat = fs.fstatSync;
+let input, reads = 0;
+fs.openSync = function(file, ...args) {{
+  const fd = open.call(this, file, ...args);
+  if (String(file) === {json.dumps(str(path))}) input = fd;
+  return fd;
+}};
+fs.fstatSync = function(fd, ...args) {{
+  const result = stat.call(this, fd, ...args);
+  if (fd === input && ++reads === {phase}) result.dev += 1n;
+  return result;
+}};
+process.on("exit", () => {{ if (reads < {phase}) process.exitCode = 92; }});
+""")
+        command = ["analyze", path]
+        if os.name == "posix":
+            checks.invoke(command, error={"error": "io", "detail": f"input changed {moment} reading"},
+                          preload=preload)
+        else:
+            require(json.loads(checks.invoke(command, preload=preload)) == report,
+                    "Windows device handling changed")
+
+
+def verify_stage_inspection(checks, graph):
+    stop = checks.failure_preload("interrupt-publication", "fs.linkSync = () => process.exit(91);")
+    with tempfile.TemporaryDirectory(prefix="cairndom-stage-test-") as directory:
+        root = Path(directory).resolve()
+        target = root / "report.json"
+        checks.invoke(["analyze", graph, "--out", target], preload=stop, exit_code=91)
+        require(not target.exists(), "report survived interruption")
+        stage, = root.iterdir()
+        data = stage / "data"
+        original = data.read_bytes()
+        fixtures = [root / (".cairndom-00000" + digit) for digit in "123"]
+        empty, linked = [path for path in fixtures if path != stage][:2]
+        foreign = root / ".cairndom-foreign"
+        empty.mkdir()
+        linked.mkdir()
+        (foreign / ".cairndom-000003").mkdir(parents=True)
+        target.write_bytes(b"existing output")
+        os.link(target, linked / "data")
+        command = ["inspect-stages", root]
+        before = set(root.rglob("*"))
+        expected = checks.reference.run("stage-report", [str(root), stage.name, empty.name, linked.name])
+        require(json.loads(checks.invoke(command)) == expected, "incorrect stage observations")
+        checks.invoke([*command, "--out", target], error=True)
+        require(before == set(root.rglob("*")) and data.read_bytes() == original
+                and target.read_bytes() == b"existing output" and os.path.samefile(linked / "data", target),
+                "inspection changed files or hard links")
 
 
 def verify(checks):

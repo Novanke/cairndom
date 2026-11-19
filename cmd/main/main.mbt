@@ -99,6 +99,58 @@ extern "js" fn file_io(
   #|     path = process.getBuiltinModule('node:path');
   #|     const target = path.resolve(input);
   #|     checkLinks(target, operation === 'write');
+  #|     if (operation === 'inspect-stages') {
+  #|       const stat = file => fs.lstatSync(file, {bigint:true});
+  #|       const root = stat(target);
+  #|       if (!root.isDirectory()) throw Error('inspection input must be a directory');
+  #|       const observe = name => {
+  #|         const candidate = path.join(target, name);
+  #|         try {
+  #|           const before = stat(candidate);
+  #|           if (before.isSymbolicLink()) return 'symbolic_link';
+  #|           if (!before.isDirectory()) return 'not_directory';
+  #|           const contents = fs.opendirSync(candidate, {bufferSize:2});
+  #|           let first, second;
+  #|           try {
+  #|             first = contents.readSync();
+  #|             second = first && contents.readSync();
+  #|           } finally { contents.closeSync(); }
+  #|           let observation = first ? 'unexpected_contents' : 'empty';
+  #|           if (first && !second && first.name === 'data') {
+  #|             const data = path.join(candidate, 'data');
+  #|             const file = stat(data);
+  #|             if (file.isFile()) {
+  #|               const again = stat(data);
+  #|               if (!again.isFile() || stamp(file) !== stamp(again) || file.nlink !== again.nlink) {
+  #|                 return 'changed';
+  #|               }
+  #|               if (file.nlink === 1n) observation = 'data_only';
+  #|               else if (file.nlink > 1n) observation = 'data_with_other_links';
+  #|             }
+  #|           }
+  #|           const after = stat(candidate);
+  #|           return after.isDirectory() && stamp(before) === stamp(after) ? observation : 'changed';
+  #|         } catch (error) {
+  #|           return error.code === 'ENOENT' || error.code === 'ENOTDIR' ? 'changed' : 'unreadable';
+  #|         }
+  #|       };
+  #|       const rows = [];
+  #|       const scan = fs.opendirSync(target);
+  #|       try {
+  #|         let count = 0;
+  #|         for (let entry; (entry = scan.readSync()) !== null;) {
+  #|           if (++count > 4096) throw Error('inspection directory has more than 4096 entries');
+  #|           const name = entry.name;
+  #|           if (/^[.]cairndom-[A-Za-z0-9]{6}$/.test(name) && name.length === 16) {
+  #|             rows.push({name, observation:observe(name)});
+  #|           }
+  #|         }
+  #|       } finally { scan.closeSync(); }
+  #|       checkLinks(target);
+  #|       const after = stat(target);
+  #|       if (!after.isDirectory() || stamp(root) !== stamp(after)) throw Error('inspection directory changed during reading');
+  #|       return {error:'', directory:target, rows};
+  #|     }
   #|     if (operation === 'read') {
   #|       const declared = fs.lstatSync(target, {bigint:true});
   #|       if (!declared.isFile() || declared.size > 2097152n) {
@@ -113,7 +165,8 @@ extern "js" fn file_io(
   #|       }
   #|       // Node 22.16 on Windows can report different path/handle device fields.
   #|       const expected = stamp(declared);
-  #|       if (stamp(named) !== expected || stamp(before, declared.dev) !== expected) throw Error('input changed before reading');
+  #|       const descriptorStamp = s => process.platform === 'win32' ? stamp(s, declared.dev) : stamp(s);
+  #|       if (stamp(named) !== expected || descriptorStamp(before) !== expected) throw Error('input changed before reading');
   #|       const bytes = new Uint8Array(Number(before.size));
   #|       let used = 0;
   #|       while (used < bytes.length) {
@@ -121,7 +174,7 @@ extern "js" fn file_io(
   #|         if (count <= 0) throw Error('input ended during reading');
   #|         used += count;
   #|       }
-  #|       if (stamp(fs.fstatSync(fd, {bigint:true}), declared.dev) !== expected) {
+  #|       if (descriptorStamp(fs.fstatSync(fd, {bigint:true})) !== expected) {
   #|         throw Error('input changed during reading');
   #|       }
   #|       const after = fs.lstatSync(target, {bigint:true});
@@ -335,7 +388,8 @@ fn run_command(args : Array[String]) -> Unit raise {
         args[0] == "analyze" ||
         args[0] == "plan-ssa" ||
         args[0] == "query" ||
-        args[0] == "trace-values"
+        args[0] == "trace-values" ||
+        args[0] == "inspect-stages"
       ) &&
       help.contains(args[1])
     ) {
@@ -348,6 +402,7 @@ fn run_command(args : Array[String]) -> Unit raise {
           "plan-ssa INPUT [--out NEW_FILE]\n" +
           "query INPUT [--out NEW_FILE]\n" +
           "trace-values INPUT [--out NEW_FILE]\n" +
+          "inspect-stages [--] DIRECTORY\n" +
           "help\n" +
           "JSON is the default format. Without --out, the result is written to stdout.\n" +
           "json-summary keeps node-level analysis and omits edge-witness expansion.\n" +
@@ -358,6 +413,8 @@ fn run_command(args : Array[String]) -> Unit raise {
           "Node.js 22.16+ is required. Exit 0 means analysis produced; exit 2 means input or I/O error.\n",
       ),
     )
+  } else if args[0] == "inspect-stages" {
+    inspect_stages_command(args)
   } else {
     execute(args)
   }

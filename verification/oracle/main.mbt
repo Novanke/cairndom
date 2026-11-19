@@ -52,6 +52,32 @@ fn source() -> Json raise {
 }
 
 ///|
+fn stage_report_expected(input : Json) -> Json raise {
+  let (directory, pending, empty, linked) = match input {
+    [String(directory), String(pending), String(empty), String(linked)] =>
+      (directory, pending, empty, linked)
+    _ => fail("expected directory and three staging fixture names")
+  }
+  let fixtures = [
+    (pending, "data_only"),
+    (empty, "empty"),
+    (linked, "data_with_other_links"),
+  ]
+  fixtures.sort_by((a, b) => a.0.compare(b.0))
+  let entries : Array[Json] = fixtures.map(fixture => {
+    let (name, observation) = fixture
+    { "name": name, "observation": observation, "possible_residue": true }
+  })
+  {
+    "schema": "cairndom.stage-inspection.v1",
+    "directory": directory,
+    "ownership": "unverified",
+    "activity": "unknown",
+    "entries": entries,
+  }
+}
+
+///|
 fn run() -> Json raise {
   let args = arguments()
   if args.length() != 1 {
@@ -64,6 +90,7 @@ fn run() -> Json raise {
     "program-cases" => @reference.program_cases()
     "invalid-cases" => @reference.invalid_cases()
     "host-cases" => @reference.host_cases()
+    "stage-report" => stage_report_expected(source())
     "query" => @reference.query_expected(source())
     "query-cases" => @reference.query_cases()
     "query-invalid-cases" => @reference.query_invalid_cases()

@@ -60,7 +60,7 @@ class CliChecks:
         self.foreign.mkdir()
         (self.foreign / "keep").write_text("unrelated task\n", encoding="utf-8")
 
-    def invoke(self, arguments, *, error=False, preload=None, timeout=30):
+    def invoke(self, arguments, *, error=False, preload=None, timeout=30, exit_code=0):
         command = [self.node]
         if preload is not None:
             command.extend(["--import", Path(preload).resolve().as_uri()])
@@ -70,11 +70,13 @@ class CliChecks:
         except subprocess.TimeoutExpired as exc:
             raise AssertionError(f"CLI hung: {arguments}") from exc
         self.calls += 1
-        require(result.returncode == (2 if error else 0),
+        require(result.returncode == (2 if error else exit_code),
                 f"unexpected exit {result.returncode}: {arguments}; stderr={result.stderr!r}")
         if error:
             require(not result.stdout, f"error leaked stdout: {arguments}")
-            diagnostic(result.stderr)
+            actual = diagnostic(result.stderr)
+            if isinstance(error, dict):
+                require(actual == error, f"unexpected diagnostic: {actual}")
         else:
             require(not result.stderr, f"successful CLI emitted stderr: {result.stderr!r}")
         stages = {path.relative_to(self.work).as_posix() for path in self.work.rglob(".cairndom-*")}
