@@ -210,7 +210,22 @@ Both backends passed all 89 tests and the three SDK examples. The five real-file
 and stdout validators covered the summary schema, file/stdout byte parity,
 destination refusal and command scoping in addition to their existing cases.
 The four default CLI example reports matched the prior version byte for byte.
-Full JSON still materializes before the output limit is enforced.
+Full JSON on this version materialized before the output limit was enforced.
+
+In 0.8.1 the snapshot and CLI full JSON writer checks the UTF-8 byte budget
+before appending each chunk. It serializes one analysis record at a time
+and writes edge witnesses from a bounded array of index triples. The CLI
+reserves a byte for the final newline and sends the report only after the
+writer succeeds. SDK regressions cover the exact budget, one byte under,
+and byte equality with the legacy serializer including the ordered witness
+prefix. CLI regressions exercise the same overflow on stdout, a new output,
+and an existing output, with the original diagnostic and preserved files.
+
+On Windows with Node 22.16.0, five alternating runs per version on each test
+graph used the process peak working set. The median for the over-budget graph
+fell from 179.2 to 68.5 MiB. On the existing large valid stdout fixture it fell
+from 75.6 to 68.8 MiB. In those runs both versions produced identical stdout,
+stderr and exit status. These figures describe the two fixtures and host.
 
 Next useful work follows correctness evidence and real consumers. Candidate
 directions include safe stage ownership/cleanup and explicit data-dependence inputs for program

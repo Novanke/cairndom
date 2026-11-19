@@ -292,12 +292,14 @@ fn execute(args : Array[String]) -> Unit raise {
         @cairn.Invalid(_) =>
           raise CommandError("limit", "output exceeds 16 MiB")
       }
+    } else if options.format == "dot" {
+      @cairn.analysis_dot(@cairn.analyze(graph))
     } else {
-      let analysis = @cairn.analyze(graph)
-      if options.format == "dot" {
-        @cairn.analysis_dot(analysis)
-      } else {
-        @cairn.analysis_json_text(analysis)
+      let saved = @cairn.prepare_analysis(graph)
+      // Reserve the final LF inside the existing CLI byte limit.
+      saved.json_text_limit(16_777_215) catch {
+        @cairn.Invalid(_) =>
+          raise CommandError("limit", "output exceeds 16 MiB")
       }
     }
   }

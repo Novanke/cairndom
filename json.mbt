@@ -112,86 +112,127 @@ fn parent_json(graph : Graph, parent : Int32?) -> Json {
 }
 
 ///|
-fn analysis_report_value(result : Analysis, include_witnesses : Bool) -> Json {
+fn analysis_node_value(result : Analysis, index : Int32) -> Json {
   let graph = result.graph
-  let n = graph.nodes.length()
-  let nodes = []
-  for index, name in graph.nodes {
-    let post_parent = result.post.immediate[index]
-    nodes.push(
-      Json::object(
-        Map([
-          ("id", Json::string(name)),
-          ("reachable", Json::boolean(result.forward.reachable[index])),
-          ("can_reach_exit", Json::boolean(result.post.reachable[index])),
-          (
-            "immediate_dominator",
-            parent_json(graph, result.forward.immediate[index]),
-          ),
-          (
-            "dominance_frontier",
-            names_json(graph, result.forward.frontiers[index]),
-          ),
-          ("immediate_postdominator", parent_json(graph, post_parent)),
-          (
-            "postdominator_is_virtual_exit",
-            Json::boolean(post_parent == Some(n)),
-          ),
-          (
-            "control_dependencies",
-            names_json(graph, result.control_dependencies[index]),
-          ),
-        ]),
+  let post_parent = result.post.immediate[index]
+  Json::object(
+    Map([
+      ("id", Json::string(graph.nodes[index])),
+      ("reachable", Json::boolean(result.forward.reachable[index])),
+      ("can_reach_exit", Json::boolean(result.post.reachable[index])),
+      (
+        "immediate_dominator",
+        parent_json(graph, result.forward.immediate[index]),
       ),
-    )
-  }
-  let loops = result.loops.map(natural_loop => {
-    Json::object(
-      Map([
-        ("header", Json::string(graph.nodes[natural_loop.header])),
-        ("latches", names_json(graph, natural_loop.latches)),
-        ("members", names_json(graph, natural_loop.members)),
-        (
-          "parent_header",
-          match natural_loop.parent {
-            Some(index) => Json::string(graph.nodes[result.loops[index].header])
-            None => Json::null()
-          },
-        ),
-      ]),
-    )
-  })
-  let components = result.components.map(component => {
-    Json::object(
-      Map([
-        ("members", names_json(graph, component.members)),
-        ("entry_nodes", names_json(graph, component.entry_nodes)),
-        ("cyclic", Json::boolean(component.cyclic)),
-        ("multiple_entries", Json::boolean(component.multiple_entries)),
-      ]),
-    )
-  })
-  let report = Map([
-    (
-      "schema",
-      Json::string(
-        if include_witnesses {
-          "cairndom.analysis.v1"
-        } else {
-          "cairndom.analysis-summary.v1"
+      ("dominance_frontier", names_json(graph, result.forward.frontiers[index])),
+      ("immediate_postdominator", parent_json(graph, post_parent)),
+      (
+        "postdominator_is_virtual_exit",
+        Json::boolean(post_parent == Some(graph.nodes.length())),
+      ),
+      (
+        "control_dependencies",
+        names_json(graph, result.control_dependencies[index]),
+      ),
+    ]),
+  )
+}
+
+///|
+fn analysis_loop_value(result : Analysis, index : Int32) -> Json {
+  let graph = result.graph
+  let natural_loop = result.loops[index]
+  Json::object(
+    Map([
+      ("header", Json::string(graph.nodes[natural_loop.header])),
+      ("latches", names_json(graph, natural_loop.latches)),
+      ("members", names_json(graph, natural_loop.members)),
+      (
+        "parent_header",
+        match natural_loop.parent {
+          Some(parent) => Json::string(graph.nodes[result.loops[parent].header])
+          None => Json::null()
         },
       ),
-    ),
-    ("entry", Json::string(graph.nodes[graph.entry])),
-    ("exits", names_json(graph, graph.exits)),
+    ]),
+  )
+}
+
+///|
+fn analysis_component_value(result : Analysis, index : Int32) -> Json {
+  let graph = result.graph
+  let component = result.components[index]
+  Json::object(
+    Map([
+      ("members", names_json(graph, component.members)),
+      ("entry_nodes", names_json(graph, component.entry_nodes)),
+      ("cyclic", Json::boolean(component.cyclic)),
+      ("multiple_entries", Json::boolean(component.multiple_entries)),
+    ]),
+  )
+}
+
+///|
+fn analysis_report_fields(
+  result : Analysis,
+  schema : String,
+) -> Array[(String, Json)] {
+  [
+    ("schema", Json::string(schema)),
+    ("entry", Json::string(result.graph.nodes[result.graph.entry])),
+    ("exits", names_json(result.graph, result.graph.exits)),
     (
       "postdominator_scope",
       Json::string("finite_paths_reaching_declared_exits"),
     ),
-    ("nodes", Json::array(nodes)),
-    ("natural_loops", Json::array(loops)),
-    ("components", Json::array(components)),
-  ])
+  ]
+}
+
+///|
+fn analysis_report_sections(
+  result : Analysis,
+) -> Array[(String, Int32, (Int32) -> Json)] {
+  [
+    (
+      "nodes",
+      result.graph.nodes.length(),
+      index => analysis_node_value(result, index),
+    ),
+    (
+      "natural_loops",
+      result.loops.length(),
+      index => analysis_loop_value(result, index),
+    ),
+    (
+      "components",
+      result.components.length(),
+      index => analysis_component_value(result, index),
+    ),
+  ]
+}
+
+///|
+fn analysis_witness_value(graph : Graph, witness : ControlWitness) -> Json {
+  Json::object(
+    Map([
+      ("controller", Json::string(graph.nodes[witness.controller])),
+      ("successor", Json::string(graph.nodes[witness.successor])),
+      ("dependent", Json::string(graph.nodes[witness.dependent])),
+    ]),
+  )
+}
+
+///|
+fn analysis_report_value(result : Analysis, include_witnesses : Bool) -> Json {
+  let schema = if include_witnesses {
+    "cairndom.analysis.v1"
+  } else {
+    "cairndom.analysis-summary.v1"
+  }
+  let report = Map(analysis_report_fields(result, schema))
+  for (name, count, row) in analysis_report_sections(result) {
+    report[name] = Json::array(Array::makei(count, row))
+  }
   if include_witnesses {
     let (witnesses, complete) = bounded_control_witnesses_of(result)
     report["control_witnesses_complete"] = Json::boolean(complete)
@@ -199,15 +240,7 @@ fn analysis_report_value(result : Analysis, include_witnesses : Bool) -> Json {
       max_control_witnesses.to_double(),
     )
     report["control_witnesses"] = Json::array(
-      witnesses.map(witness => {
-        Json::object(
-          Map([
-            ("controller", Json::string(graph.nodes[witness.controller])),
-            ("successor", Json::string(graph.nodes[witness.successor])),
-            ("dependent", Json::string(graph.nodes[witness.dependent])),
-          ]),
-        )
-      }),
+      witnesses.map(witness => analysis_witness_value(result.graph, witness)),
     )
   }
   Json::object(report)

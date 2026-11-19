@@ -252,9 +252,34 @@ test "analysis snapshot preparation rejects invalid graphs before creating a rep
 }
 
 ///|
+test "full analysis JSON accepts an exact byte budget and rejects invalid or smaller budgets" {
+  let loop_graph = analysis_snapshot_test_graph()
+  for graph in [loop_graph, { ..loop_graph, exits: [], }] {
+    let saved = prepare_analysis(graph)
+    let expected = analysis_json_text(saved.analysis())
+    // Validated IDs and fixed report text are ASCII, so length is the byte budget.
+    assert_eq(saved.json_text_limit(expected.length()), expected)
+    for limit in [expected.length() - 1, 0, -1, 16_777_217] {
+      assert_true(
+        try {
+          ignore(saved.json_text_limit(limit))
+          false
+        } catch {
+          Invalid(_) => true
+        },
+      )
+    }
+  }
+}
+
+///|
 test "oversized saved analysis remains inspectable and DOT exportable while JSON fails completely" {
   let short_names = witness_overflow_graph()
-  let bounded = match @json.parse(prepare_analysis(short_names).json_text()) {
+  let short_saved = prepare_analysis(short_names)
+  let short_legacy = analysis_json_text(short_saved.analysis())
+  let short_json = short_saved.json_text_limit(short_legacy.length())
+  assert_eq(short_json, short_legacy)
+  let bounded = match @json.parse(short_json) {
     Object(object) => object
     _ => fail("expected an analysis report object")
   }
@@ -262,10 +287,15 @@ test "oversized saved analysis remains inspectable and DOT exportable while JSON
     required(bounded, "control_witnesses_complete").stringify(),
     "false",
   )
-  assert_eq(
-    items(required(bounded, "control_witnesses"), 65536).length(),
-    65536,
-  )
+  let witnesses = items(required(bounded, "control_witnesses"), 65536)
+  assert_eq(witnesses.length(), 65536)
+  let last = match witnesses[65535] {
+    Object(object) => object
+    _ => fail("expected a control witness object")
+  }
+  assert_eq(required(last, "controller"), Json::string("n28"))
+  assert_eq(required(last, "successor"), Json::string("n88"))
+  assert_eq(required(last, "dependent"), Json::string("n94"))
   let prefix = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ012345678"
   let graph : Graph = {
     ..short_names,

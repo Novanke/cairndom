@@ -2,7 +2,8 @@
 """Exercise real graph files; independent algorithms and cases run in MoonBit."""
 import json
 import os
-from host import ROOT, require, run_checks
+import subprocess
+from host import ROOT, diagnostic, require, run_checks
 
 INPUT_LIMIT = 2_097_152
 
@@ -109,9 +110,40 @@ fs.openSync = function(file, ...args) {{
     else:
         checks.skips.append("POSIX FIFO replacement race unavailable on this platform")
 
+def verify_analysis_output_limit(checks):
+    graph = checks.reference.run("host-cases")["large_stdout_graph"].copy()
+    nodes = graph["nodes"]
+    # Parallel controllers enter different points of a shared chain. The
+    # full report expands their witnesses, while the summary keeps node sets.
+    controllers = nodes[1:49]
+    graph["edges"] = [[nodes[0], controller] for controller in controllers]
+    graph["edges"].extend([controller, nodes[-1]] for controller in controllers)
+    graph["edges"].extend([controller, entry] for controller in controllers for entry in nodes[49:89])
+    graph["edges"].extend([nodes[index], nodes[index + 1]] for index in range(49, 127))
+    path = checks.put_graph("dense-analysis", graph)
+    unopened = checks.work / "oversized-new.json"
+    existing = checks.work / "oversized-existing.json"
+    existing.write_bytes(b"keep this output\n")
+    before = set(checks.work.rglob("*"))
+    for options in ([], ["--out", unopened], ["--out", existing]):
+        result = subprocess.run([checks.node, str(checks.cli), "analyze", str(path), *map(str, options)],
+                                cwd=checks.work, capture_output=True, timeout=30)
+        checks.calls += 1
+        require(result.returncode == 2 and not result.stdout, "oversized analysis did not fail cleanly")
+        require(diagnostic(result.stderr) == {"error": "limit", "detail": "output exceeds 16 MiB"},
+                "oversized analysis changed the limit diagnostic")
+        require(set(checks.work.rglob("*")) == before and existing.read_bytes() == b"keep this output\n",
+                "oversized analysis created a target or stage, or changed existing output")
+    summary = json.loads(checks.invoke(["analyze", path, "--format", "json-summary"]))
+    require(summary["schema"] == "cairndom.analysis-summary.v1" and
+            summary["nodes"][49]["control_dependencies"] == controllers,
+            "summary lost node-level control dependencies for the oversized analysis")
+
+
 def verify(checks):
     verify_graphs(checks)
     verify_formats_and_errors(checks)
+    verify_analysis_output_limit(checks)
 
 
 if __name__ == "__main__":

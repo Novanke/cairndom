@@ -28,19 +28,17 @@
 - Prepare an owned full graph-analysis snapshot, inspect deep copies, and export
   the saved JSON/DOT after callers change their input or displayed result.
 - Export a distinct node-level JSON summary without building edge witnesses.
+- Check the complete JSON byte budget as snapshot and CLI reports are
+  serialized. Preserve legacy report layout and witness metadata.
 
 ## Next candidates
 
 Prioritize observed correctness problems and reproducible consumers.
 
-1. **Report generation.** The summary format skips edge expansion when only node
-   analysis is needed. Full JSON still materializes before its size check.
-   Investigate checking the budget during serialization while preserving default
-   bytes and witness completeness metadata.
-2. **File identity and recovery.** Review platform-specific file identity checks
+1. **File identity and recovery.** Review platform-specific file identity checks
    and design read-only discovery of abandoned stages before considering an
    ownership protocol for cleanup. The current scope is trusted local directories.
-3. **Cost of narrow queries.** Loop-boundary and edge-witness callers still run
+2. **Cost of narrow queries.** Loop-boundary and edge-witness callers still run
    full analysis. Evaluate dedicated paths and check result parity before any
    performance claim.
 

@@ -56,11 +56,23 @@ pub fn AnalysisSnapshot::analysis(self : Self) -> Analysis {
 /// Witness expansion retains its completeness flag and bounded prefix. Exports
 /// exceeding 16 MiB raise GraphError without changing the saved analysis.
 pub fn AnalysisSnapshot::json_text(self : Self) -> String raise GraphError {
-  let text = analysis_json_text(self.stored)
-  if text.length() > 16_777_216 {
-    raise Invalid("analysis JSON exceeds 16 MiB")
+  self.json_text_limit(max_analysis_json_bytes) catch {
+    Invalid(_) => raise Invalid("analysis JSON exceeds 16 MiB")
   }
-  text
+}
+
+///|
+/// Write the same full report with an inclusive UTF-8 byte limit, excluding
+/// any final newline added by the caller. Accepts budgets from 0 to 16 MiB.
+/// The writer stops at the first over-budget fragment and returns no report.
+pub fn AnalysisSnapshot::json_text_limit(
+  self : Self,
+  limit : Int32,
+) -> String raise GraphError {
+  if limit < 0 || limit > max_analysis_json_bytes {
+    raise Invalid("analysis JSON byte limit must be between 0 and 16 MiB")
+  }
+  bounded_analysis_json_text(self.stored, limit)
 }
 
 ///|
