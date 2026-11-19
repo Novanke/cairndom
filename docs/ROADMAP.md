@@ -33,6 +33,10 @@
 - Compare actual device and inode identity before and after reads on POSIX.
   Inspect same-parent report stage candidates and their filesystem metadata
   through the read-only `inspect-stages` command.
+- Query natural-loop boundaries using entry reachability, immediate dominators
+  and loop membership. Query edge-level control witnesses using entry
+  reachability and immediate postdominators. Both paths retain graph validation,
+  ordering and capacity limits.
 
 ## Next candidates
 
@@ -41,9 +45,8 @@ Prioritize observed correctness problems and reproducible consumers.
 1. **Stage ownership.** Evaluate an ownership and activity protocol before
    considering cleanup. Existing stage observations describe the filesystem
    at scan time in a trusted local directory.
-2. **Cost of narrow queries.** Loop-boundary and edge-witness callers still run
-   full analysis. Evaluate dedicated paths and check result parity before any
-   performance claim.
+2. **Program slicing.** Define explicit data-dependence inputs before exposing
+   a slicing API. Document which relationships clients must supply.
 
 The existing mutable Analysis API requires valid, unmodified results to
 serialize. Callers can use AnalysisSnapshot for saved reports.

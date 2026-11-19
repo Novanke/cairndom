@@ -81,10 +81,22 @@ fn graph_structure(
     })
   }
 
+  let loops = natural_loops(graph, pred, forward.parent_tree(), nest=true)
+  (loops, components)
+}
+
+///|
+fn natural_loops(
+  graph : Graph,
+  pred : Array[Array[Int32]],
+  forward : DominatorTree,
+  nest~ : Bool,
+) -> Array[NaturalLoop] {
+  let n = graph.nodes.length()
   // Collect all back edges for a header before taking predecessor closure.
   let by_header : Array[Array[Int32]] = Array::makei(n, _ => [])
   for (latch, header) in graph.edges {
-    if dominates_validated(forward, header, latch) {
+    if forward.dominates(header, latch) {
       by_header[header].push(latch)
     }
   }
@@ -114,7 +126,7 @@ fn graph_structure(
           continue
         }
         considered[previous] = true
-        if dominates_validated(forward, header, previous) {
+        if forward.dominates(header, previous) {
           included[previous] = true
           stack.push(previous)
         }
@@ -127,7 +139,12 @@ fn graph_structure(
       }
     }
     loops.push({ header, latches: latches.copy(), members, parent: None, })
-    loop_membership.push(included)
+    if nest {
+      loop_membership.push(included)
+    }
+  }
+  if !nest {
+    return loops
   }
   for index, natural_loop in loops {
     let mut parent : Int32? = None
@@ -144,5 +161,5 @@ fn graph_structure(
     }
     loops[index] = { ..natural_loop, parent, }
   }
-  (loops, components)
+  loops
 }

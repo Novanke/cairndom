@@ -248,6 +248,19 @@ optimized CLIs matched stdout, stderr, and exit status for 119 comparisons.
 These covered 113 oracle graphs, four default CLI examples, DOT, and a
 node-level JSON summary.
 
+In 0.8.3 the public narrow queries share the immediate-dominator solver with
+full analysis. The loop-boundary path computes reachable natural-loop
+membership and latches without frontiers or nesting. The control witness
+path uses immediate postdominators on finite paths to reachable terminal
+exits, with an empty result when no declared exit is reachable. Standalone
+queries avoid strong components and the full node-level control relation.
+
+The independent MoonBit definitions check exact ordered public results for
+1,536 three-node loop configurations and 2,187 three-node witness
+configurations. Existing nested, irreducible and unreachable graph cases,
+the exact 65,536-witness boundary, capacity errors and graph-validation
+diagnostics also exercise the public paths.
+
 Next useful work follows correctness evidence and real consumers. Candidate
 directions include safe stage ownership/cleanup and explicit data-dependence inputs for program
 slicing. General source-language/IR parsing,

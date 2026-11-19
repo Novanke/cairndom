@@ -150,18 +150,18 @@ pub fn dominates(
   if ancestor < 0 || ancestor >= n || node < 0 || node >= n {
     raise Invalid("dominance query index is outside the tree")
   }
-  dominates_validated(tree, ancestor, node)
+  tree.parent_tree().dominates(ancestor, node)
 }
 
 ///|
-// Internal analyses call this only on freshly computed, valid trees.
-fn dominates_validated(
-  tree : Dominance,
+// The parent tree comes from the solver or a validated public Dominance.
+fn DominatorTree::dominates(
+  self : Self,
   ancestor : Int32,
   node : Int32,
 ) -> Bool {
-  let n = tree.reachable.length()
-  if !tree.reachable[ancestor] || !tree.reachable[node] {
+  let n = self.reachable.length()
+  if !self.reachable[ancestor] || !self.reachable[node] {
     return false
   }
   let mut cursor = node
@@ -169,7 +169,7 @@ fn dominates_validated(
     if cursor == ancestor {
       return true
     }
-    match tree.immediate[cursor] {
+    match self.immediate[cursor] {
       None => return false
       Some(parent) => cursor = parent
     }

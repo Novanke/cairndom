@@ -1,4 +1,17 @@
 ///|
+// Immediate parents and reachability are enough for queries that never
+// enumerate dominance frontiers.
+priv struct DominatorTree {
+  reachable : Array[Bool]
+  immediate : Array[Int32?]
+}
+
+///|
+fn Dominance::parent_tree(self : Self) -> DominatorTree {
+  { reachable: self.reachable, immediate: self.immediate, }
+}
+
+///|
 /// Intersect two known immediate-dominator chains using reverse-postorder ranks.
 fn intersect_dominators(
   parents : Array[Int32],
@@ -22,11 +35,11 @@ fn intersect_dominators(
 ///|
 /// Cooper-Harvey-Kennedy iteration over DFS reverse postorder. The caller supplies
 /// valid adjacency arrays and a valid root, including a virtual root if needed.
-fn compute_dominance(
+fn compute_dominator_tree(
   succ : Array[Array[Int32]],
   pred : Array[Array[Int32]],
   root : Int32,
-) -> Dominance {
+) -> DominatorTree {
   let n = succ.length()
   let reachable = Array::make(n, false)
   let postorder : Array[Int32] = []
@@ -89,23 +102,34 @@ fn compute_dominance(
       immediate[node] = Some(parents[node])
     }
   }
+  { reachable, immediate, }
+}
+
+///|
+fn compute_dominance(
+  succ : Array[Array[Int32]],
+  pred : Array[Array[Int32]],
+  root : Int32,
+) -> Dominance {
+  let { reachable, immediate, } = compute_dominator_tree(succ, pred, root)
+  let n = reachable.length()
   let marks = Array::makei(n, _ => Array::make(n, false))
-  for target in rpo {
+  for target in 0..<n {
+    if !reachable[target] {
+      continue
+    }
+    let stop = immediate[target]
     for predecessor in pred[target] {
       if reachable[predecessor] {
         let mut runner = predecessor
-        while true {
-          // A strict dominator of target cannot contain target in its frontier.
-          // The root has no strict dominator, so an edge back to it must also
-          // put root in its own frontier. This includes a one-node self-loop.
-          if target != root && runner == parents[target] {
-            break
-          }
+        // A strict dominator of target cannot contain target in its frontier.
+        // With no strict parent, the root can be in its own frontier.
+        while Some(runner) != stop {
           marks[runner][target] = true
           if runner == root {
             break
           }
-          runner = parents[runner]
+          runner = immediate[runner].unwrap()
         }
       }
     }

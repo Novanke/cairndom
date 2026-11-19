@@ -7,12 +7,13 @@ pub fn analyze(input : Graph) -> Analysis raise GraphError {
   let (succ, pred) = adjacency(graph)
   let forward = compute_dominance(succ, pred, graph.entry)
   let post = compute_postdominance(graph, forward.reachable)
+  let post_tree = post.parent_tree()
   let controls = Array::makei(n, _ => Array::make(n, false))
   for (from, to) in graph.edges {
     if !post.reachable[from] || !post.reachable[to] {
       continue
     }
-    if from != to && dominates_validated(post, to, from) {
+    if from != to && post_tree.dominates(to, from) {
       continue
     }
     let stop = post.immediate[from]

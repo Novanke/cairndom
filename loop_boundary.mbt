@@ -19,13 +19,17 @@ pub extend LoopBoundary with Debug::{to_repr}
 let max_loop_boundary_edges : Int32 = 65536
 
 ///|
-/// Requires an unmodified, valid result from analyze. Returned edge arrays are
-/// fresh copies and do not share storage with the graph or natural-loop arrays.
+// The graph and natural loops are already validated and entry-reachable.
 fn loop_boundaries_of(
-  analysis : Analysis,
+  graph : Graph,
+  reachable : Array[Bool],
+  loops : Array[NaturalLoop],
 ) -> Array[LoopBoundary] raise GraphError {
-  let n = analysis.graph.nodes.length()
-  let edges = analysis.graph.edges.copy()
+  if loops.is_empty() {
+    return []
+  }
+  let n = graph.nodes.length()
+  let edges = graph.edges.copy()
   edges.sort_by(fn(left, right) {
     if left.0 != right.0 {
       left.0.compare(right.0)
@@ -35,7 +39,7 @@ fn loop_boundaries_of(
   })
   let boundaries : Array[LoopBoundary] = []
   let mut emitted_edges = 0
-  for natural_loop in analysis.loops {
+  for natural_loop in loops {
     let members = Array::make(n, false)
     let latches = Array::make(n, false)
     for node in natural_loop.members {
@@ -48,7 +52,7 @@ fn loop_boundaries_of(
     let leaving_edges = []
     let back_edges = []
     for (from, to) in edges {
-      if !analysis.forward.reachable[from] || !analysis.forward.reachable[to] {
+      if !reachable[from] || !reachable[to] {
         continue
       }
       if !members[from] && members[to] {
@@ -87,7 +91,12 @@ fn loop_boundaries_of(
 /// Describe natural-loop boundaries in header order, excluding unreachable
 /// edges. A loop containing the graph entry has no synthetic entering edge.
 /// An empty leaving-edge list describes graph structure, not termination.
-/// Raise GraphError if the combined edge lists would exceed 65,536 pairs.
+/// Only entry reachability, immediate dominators and loop membership are
+/// needed. Raise GraphError if the combined lists exceed 65,536 edge pairs.
 pub fn loop_boundaries(graph : Graph) -> Array[LoopBoundary] raise GraphError {
-  loop_boundaries_of(analyze(graph))
+  let graph = snapshot_graph(graph)
+  let (succ, pred) = adjacency(graph)
+  let forward = compute_dominator_tree(succ, pred, graph.entry)
+  let loops = natural_loops(graph, pred, forward, nest=false)
+  loop_boundaries_of(graph, forward.reachable, loops)
 }

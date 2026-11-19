@@ -106,6 +106,13 @@ fn boundary_nested_graph() -> Graph {
 }
 
 ///|
+fn boundaries_from_full_analysis(
+  analysis : Analysis,
+) -> Array[LoopBoundary] raise GraphError {
+  loop_boundaries_of(analysis.graph, analysis.forward.reachable, analysis.loops)
+}
+
+///|
 test "nested loop boundaries retain inner exits to the outer loop and merged latches" {
   let graph = boundary_nested_graph()
   let boundaries = loop_boundaries(graph)
@@ -124,7 +131,7 @@ test "nested loop boundaries retain inner exits to the outer loop and merged lat
     },
   ])
   assert_eq(boundaries, boundary_definition(graph))
-  assert_eq(boundaries, loop_boundaries_of(analyze(graph)))
+  assert_eq(boundaries, boundaries_from_full_analysis(analyze(graph)))
   let reordered = {
     ..graph,
     edges: Array::makei(graph.edges.length(), index => {
@@ -179,7 +186,7 @@ test "irreducible cycles without natural loops have no invented loop boundaries"
 test "boundary edge arrays are owned independently of input and analysis arrays" {
   let graph = boundary_nested_graph()
   let analysis = analyze(graph)
-  let boundaries = loop_boundaries_of(analysis)
+  let boundaries = boundaries_from_full_analysis(analysis)
   let independent = loop_boundaries(graph)
   graph.edges.clear()
   graph.nodes[0] = "changed"
@@ -201,7 +208,7 @@ test "boundary edge arrays are owned independently of input and analysis arrays"
 }
 
 ///|
-test "loop boundary API validates typed graphs" {
+test "loop boundary API preserves graph validation diagnostics" {
   let graph : Graph = {
     nodes: ["entry", "exit"],
     edges: [(0, 1)],
@@ -209,18 +216,18 @@ test "loop boundary API validates typed graphs" {
     exits: [1],
   }
   for
-    invalid in [
-      { ..graph, entry: -1, },
-      { ..graph, edges: [(0, 1), (0, 1)], },
-      { ..graph, exits: [0], },
+    (invalid, expected) in [
+      ({ ..graph, entry: -1, }, "entry index is outside the graph"),
+      ({ ..graph, edges: [(0, 1), (0, 1)], }, "duplicate edge"),
+      ({ ..graph, exits: [0], }, "declared exits must have no outgoing edges"),
     ] {
-    let rejected = try {
+    let error = try {
       ignore(loop_boundaries(invalid))
-      false
+      ""
     } catch {
-      Invalid(_) => true
+      Invalid(message) => message
     }
-    assert_true(rejected)
+    assert_eq(error, expected)
   }
 }
 
@@ -244,7 +251,9 @@ test "all three-node graph boundaries match node-removal and forward-path defini
         entry,
         exits: [],
       }
-      assert_eq(loop_boundaries_of(analyze(graph)), boundary_definition(graph))
+      let expected = boundary_definition(graph)
+      assert_eq(boundaries_from_full_analysis(analyze(graph)), expected)
+      assert_eq(loop_boundaries(graph), expected)
     }
   }
 }
@@ -285,7 +294,7 @@ test "dense nested loops reject global boundary edge expansion before returning 
   }
   assert_eq(expected_pairs, 295119)
   let internal_error = try {
-    ignore(loop_boundaries_of(analysis))
+    ignore(boundaries_from_full_analysis(analysis))
     ""
   } catch {
     Invalid(message) => message

@@ -84,7 +84,9 @@ fn check_witness_definition(graph : Graph) -> Unit raise {
   let analysis = analyze(graph)
   let (actual, complete) = bounded_control_witnesses_of(analysis)
   assert_true(complete)
-  assert_eq(witness_triples(actual), witness_definition(graph))
+  let expected = witness_definition(graph)
+  assert_eq(witness_triples(actual), expected)
+  assert_eq(witness_triples(control_dependence_witnesses(graph)), expected)
   let controllers = Array::makei(graph.nodes.length(), _ => [])
   for dependent in 0..<graph.nodes.length() {
     for controller in 0..<graph.nodes.length() {
@@ -177,7 +179,7 @@ test "declared exits exclude permanent cycles and unreachable inducing edges" {
 }
 
 ///|
-test "witness API validates graph inputs through analysis" {
+test "witness API preserves graph validation diagnostics" {
   let graph : Graph = {
     nodes: ["entry", "exit"],
     edges: [(0, 1)],
@@ -185,18 +187,18 @@ test "witness API validates graph inputs through analysis" {
     exits: [1],
   }
   for
-    invalid in [
-      { ..graph, entry: -1, },
-      { ..graph, edges: [(0, 1), (0, 1)], },
-      { ..graph, exits: [0], },
+    (invalid, expected) in [
+      ({ ..graph, entry: -1, }, "entry index is outside the graph"),
+      ({ ..graph, edges: [(0, 1), (0, 1)], }, "duplicate edge"),
+      ({ ..graph, exits: [0], }, "declared exits must have no outgoing edges"),
     ] {
-    let rejected = try {
+    let error = try {
       ignore(control_dependence_witnesses(invalid))
-      false
+      ""
     } catch {
-      Invalid(_) => true
+      Invalid(message) => message
     }
-    assert_true(rejected)
+    assert_eq(error, expected)
   }
 }
 
@@ -284,13 +286,13 @@ test "witness overflow returns a deterministic bounded prefix and SDK rejects it
   )
   assert_false(reversed_complete)
   assert_eq(reversed_witnesses, witnesses)
-  let rejected = try {
+  let error = try {
     ignore(control_dependence_witnesses(graph))
-    false
+    ""
   } catch {
-    Invalid(_) => true
+    Invalid(message) => message
   }
-  assert_true(rejected)
+  assert_eq(error, "control-dependence witness limit of 65536 exceeded")
   // Witness truncation never truncates the original node-level relation.
   let all_controllers = Array::makei(48, index => index + 1)
   assert_eq(analysis.control_dependencies[0], [])
@@ -338,11 +340,11 @@ test "exactly 65536 witnesses remain complete and accepted by the SDK" {
   )
   assert_false(overflow_complete)
   assert_eq(overflow.length(), 65536)
-  let rejected = try {
+  let error = try {
     ignore(control_dependence_witnesses(graph))
-    false
+    ""
   } catch {
-    Invalid(_) => true
+    Invalid(message) => message
   }
-  assert_true(rejected)
+  assert_eq(error, "control-dependence witness limit of 65536 exceeded")
 }
