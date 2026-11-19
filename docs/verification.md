@@ -25,7 +25,7 @@ filesystem limits. Its `--node` and `--cli` arguments allow the same checks agai
 a separately installed registry consumer.
 
 Local verification on Windows with the versions above passed both backend
-checks, all 84 test blocks on each backend, the optimized JavaScript build and
+checks, all 89 test blocks on each backend, the optimized JavaScript build and
 the SDK examples on both backends. The separate graph CLI oracle passed 115 graph cases and 161
 actual process invocations, including maximum graph limits, exact input size,
 partial writes, close failures and a competing output writer. Windows symlink
@@ -169,9 +169,35 @@ existing-output/input preservation, partial staged writes and both relation
 capacity boundaries. The documented Windows symlink/POSIX FIFO skips remain;
 the matching public Linux job is required before publication.
 
+The 0.7.0 review considered owned graph reports, safe abandoned-stage cleanup and
+explicit data-dependence inputs, without a new confirmed mathematical bug. The
+selected API gap was that mutable Analysis values must remain valid and
+unmodified for the existing serializers. `prepare_analysis` now retains one
+private full analysis; `AnalysisSnapshot.analysis()` deep-copies graph arrays,
+both trees and their frontier rows, loops, components and control dependencies.
+JSON/DOT describe that saved computation even after input/inspection edits.
+Exports still serialize values and derive bounded edge witnesses each time;
+they do not rerun full analysis or cache the wire text. Existing witness-prefix
+and completeness metadata remain intact.
+
+Five regression blocks verify every nested array category and scalar record,
+legacy JSON/DOT equality, independent inspection copies, finite-exit/no-exit
+scope, irreducible/nested loops, unreachable data, the 512-node/513-slot maximum
+and malformed inputs. A dense graph checks both the bounded witness prefix and
+an actual JSON result over 16 MiB: SDK JSON export raises GraphError while the
+saved analysis remains inspectable and DOT-exportable. Preparation does not
+eagerly serialize. The CLI still uses its existing serializer/limit path, so
+its error classification and all existing entry points are unchanged.
+
+Local 0.7.0 verification passed both backend checks and all 89 test blocks per
+backend, the optimized JS build, all three SDK examples on both backends and the
+five host validators (404 actual CLI calls). The public SDK example mutates its
+input and inspection copy, then checks stable saved JSON/DOT. Windows symlink
+and POSIX FIFO skips remain as documented; matching public Linux and Windows
+CI must pass before publication.
+
 Next useful work follows correctness evidence and real consumers. Candidate
-directions include owned graph report snapshots, safe stage ownership/cleanup
-and explicit data-dependence inputs for program
+directions include safe stage ownership/cleanup and explicit data-dependence inputs for program
 slicing. General source-language/IR parsing,
 instruction ordering, variable renaming and program rewriting require separate
 designs. The current phi planner reports locations and incoming-value needs;

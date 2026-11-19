@@ -64,7 +64,7 @@ SDK 的 `loop_boundaries(graph)` 为每个自然循环列出进入边、离开�
 ## SDK
 
 ```sh
-moon add Novanke/cairndom@0.6.0
+moon add Novanke/cairndom@0.7.0
 ```
 
 在调用方 `moon.pkg` 中导入 `"Novanke/cairndom" @dom`。可直接构建 `Graph`，或调用 `parse_graph`。核心入口为 `analyze`，也可单独调用 `dominators` 或 `postdominators`。图边使用节点数组索引。
@@ -76,6 +76,19 @@ let phi_candidates = @dom.iterated_frontier(result.forward, definition_indices)
 ```
 
 `iterated_frontier` 可接收调用方提供的 `live_in` 节点做剪枝。该接口计算候选位置，调用方负责变量定义、活跃性和具体 IR。后支配树中的虚拟出口索引为 `graph.nodes.length()`。分析结果拥有输入数组的副本。序列化函数要求结果仍保持 `analyze` 生成的有效结构，编辑图后应再次分析。
+
+需要先查看完整分析、再导出同一份 JSON/DOT 的编辑器或 SDK 程序，可以保存不可变快照：
+
+```moonbit
+let saved = @dom.prepare_analysis(graph)
+let inspected = saved.analysis()
+let json = saved.json_text()
+let dot = saved.dot_text()
+```
+
+`prepare_analysis` 只调用一次完整 `analyze`。`analysis()` 深层复制图、两棵支配树及边界集合、循环、强连通分量和控制依赖；每次读取都可独立修改。修改原始图或检查副本，都不会改变快照之后导出的内容。JSON 与 DOT 继续使用原有格式；导出时仍会生成序列化内容和边级证据，并非缓存字符串。需要分析修改后的图时，应重新调用 `prepare_analysis`，而不是修改检查副本。
+
+快照的 `json_text()` 限制为 16 MiB，超限报错时仍可检查分析并导出 DOT；当前图尺寸上限可保证 DOT 小于该限制。边级证据保留原有的有界前缀与 `control_witnesses_complete` 标志，需要完整证据时仍须检查该标志。`AnalysisSnapshot` 是进程内对象，没有把报告重新解析为快照的接口。现有可修改的 `Analysis`、旧序列化接口和 CLI 行为保持不变。`examples/sdk` 会修改原图与检查副本，再断言已保存的两种导出保持一致。
 
 公开支配查询会先检查树的完整结构，拒绝父链成环、断链、无效根和损坏的边界集合。结构检查无法证明手工填写的支配边界与原图在数学上相符；编辑图后应重新调用 `analyze` 或 `dominators`。
 

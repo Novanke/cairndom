@@ -25,14 +25,16 @@
 - Explain each reachable block-variable use with its possible last-definition
   blocks and incoming-value requirement, retain an owned SDK result, and export
   the same complete named report through `trace-values` without overwriting files.
+- Prepare an owned full graph-analysis snapshot, inspect deep copies, and export
+  the saved JSON/DOT after callers change their input or displayed result.
 
 ## Next candidates
 
-Prioritize observed correctness problems and reproducible consumers. The 0.6.0
-review found no new confirmed mathematical bug. It considered per-use value
-origins (now implemented), owned graph reports and safe abandoned-stage cleanup.
-Owned graph reports could support inspect/edit/export clients, but the current
-mutable Analysis contract still requires valid, unmodified results to serialize.
+Prioritize observed correctness problems and reproducible consumers. The 0.7.0
+review found no new confirmed mathematical bug. It considered owned graph reports
+(now implemented), safe abandoned-stage cleanup and explicit data-dependence
+inputs. The existing mutable Analysis API still requires valid, unmodified
+results to serialize; callers can opt into AnalysisSnapshot for saved reports.
 Safe cleanup of abandoned `.cairndom-*` stages needs explicit ownership markers;
 the current CLI discloses possible leftovers and does not blindly delete them.
 Value origins describe possible sources under the block-use convention, without

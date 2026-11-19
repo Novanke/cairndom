@@ -36,6 +36,8 @@ pub fn plan_ssa(FlowProgram) -> SsaPlan raise GraphError
 
 pub fn postdominators(Graph) -> Dominance raise GraphError
 
+pub fn prepare_analysis(Graph) -> AnalysisSnapshot raise GraphError
+
 pub fn prepare_ssa(FlowProgram) -> SsaSnapshot raise GraphError
 
 pub fn program_json_text(FlowProgram) -> String raise GraphError
@@ -62,6 +64,11 @@ pub(all) struct Analysis {
   components : Array[Component]
   control_dependencies : Array[Array[Int32]]
 }
+
+type AnalysisSnapshot
+pub fn AnalysisSnapshot::analysis(Self) -> Analysis
+pub fn AnalysisSnapshot::dot_text(Self) -> String
+pub fn AnalysisSnapshot::json_text(Self) -> String raise GraphError
 
 pub(all) struct Component {
   members : Array[Int32]
