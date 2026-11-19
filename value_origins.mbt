@@ -29,6 +29,136 @@ struct ValueOrigins {
 let max_value_origin_relations : Int32 = 65536
 
 ///|
+priv struct ValueOriginGraph {
+  entry : Int32
+  reachable : Array[Bool]
+  predecessors : Array[Array[Int32]]
+}
+
+///|
+fn value_origin_graph(graph : Graph) -> ValueOriginGraph {
+  let (successors, predecessors) = adjacency(graph)
+  let reachable = Array::make(graph.nodes.length(), false)
+  let visit = [graph.entry]
+  reachable[graph.entry] = true
+  let mut next = 0
+  while next < visit.length() {
+    let node = visit[next]
+    next += 1
+    for child in successors[node] {
+      if !reachable[child] {
+        reachable[child] = true
+        visit.push(child)
+      }
+    }
+  }
+  { entry: graph.entry, reachable, predecessors, }
+}
+
+///|
+fn ValueOriginGraph::definition_sites(
+  self : Self,
+  program : FlowProgram,
+  variable : Int32,
+) -> Array[Bool] {
+  Array::makei(self.reachable.length(), node => {
+    self.reachable[node] && program.definitions[node].contains(variable)
+  })
+}
+
+///|
+// Walk reachable predecessors until the first definition on each route. The
+// budget includes the incoming-value marker, as in the full report.
+fn ValueOriginGraph::find_origins(
+  self : Self,
+  node : Int32,
+  variable : Int32,
+  defined : Array[Bool],
+  budget : Int32,
+) -> (UseOrigins, Int32) raise GraphError {
+  let seen = Array::make(self.reachable.length(), false)
+  let sources = Array::make(self.reachable.length(), false)
+  let work = [node]
+  seen[node] = true
+  let mut cursor = 0
+  let mut relations = 0
+  let mut requires_entry_value = false
+  while cursor < work.length() {
+    let current = work[cursor]
+    cursor += 1
+    if current == self.entry {
+      if relations == budget {
+        raise Invalid("value-origin relation limit of 65536 exceeded")
+      }
+      relations += 1
+      requires_entry_value = true
+    }
+    for previous in self.predecessors[current] {
+      if !self.reachable[previous] {
+        continue
+      }
+      // Test definitions before seen: an already visited use block can
+      // supply its local definition through a self-edge or another cycle.
+      if defined[previous] {
+        if !sources[previous] {
+          if relations == budget {
+            raise Invalid("value-origin relation limit of 65536 exceeded")
+          }
+          relations += 1
+          sources[previous] = true
+        }
+      } else if !seen[previous] {
+        seen[previous] = true
+        work.push(previous)
+      }
+    }
+  }
+  let definitions = []
+  for source, yes in sources {
+    if yes {
+      definitions.push(source)
+    }
+  }
+  ({ node, variable, definitions, requires_entry_value, }, relations)
+}
+
+///|
+/// Explain one declared use before local definitions, using block and variable
+/// indices into program. The result matches the corresponding trace_values row
+/// and its definitions are owned. Return None for a declared unreachable use.
+/// Invalid indices, malformed program facts, or a pair absent from the block's
+/// uses row raise GraphError. The aggregate result limit does not apply here.
+pub fn trace_use(
+  program : FlowProgram,
+  node : Int32,
+  variable : Int32,
+) -> UseOrigins? raise GraphError {
+  validate_program(program)
+  if node < 0 || node >= program.graph.nodes.length() {
+    raise Invalid("value-origin node index is outside the graph")
+  }
+  if variable < 0 || variable >= program.variables.length() {
+    raise Invalid("value-origin variable index is outside the program")
+  }
+  if !program.uses[node].contains(variable) {
+    raise Invalid("value-origin use is not declared in the block")
+  }
+  let search = value_origin_graph(program.graph)
+  if !search.reachable[node] {
+    return None
+  }
+  let defined = search.definition_sites(program, variable)
+  // One use has at most one source per node plus one incoming-value marker.
+  let (origin, _) = search.find_origins(
+    node,
+    variable,
+    defined,
+    search.reachable.length() + 1,
+  )
+  Some(origin)
+}
+
+///|
 /// Explain each entry-reachable use over all finite entry-to-use paths,
 /// including uses in permanent loops. Uses precede local definitions; a block's
 /// own definition can reach its use through a previous loop iteration.
@@ -45,29 +175,13 @@ pub fn trace_values(input : FlowProgram) -> ValueOrigins raise GraphError {
     definitions: input.definitions.map(row => row.copy()),
     uses: input.uses.map(row => row.copy()),
   }
-  let graph = program.graph
-  let n = graph.nodes.length()
-  let (succ, pred) = adjacency(graph)
-  let reachable = Array::make(n, false)
-  let visit = [graph.entry]
-  reachable[graph.entry] = true
-  let mut next = 0
-  while next < visit.length() {
-    let node = visit[next]
-    next += 1
-    for child in succ[node] {
-      if !reachable[child] {
-        reachable[child] = true
-        visit.push(child)
-      }
-    }
-  }
+  let search = value_origin_graph(program.graph)
   let use_sites : Array[Array[Int32]] = Array::makei(
     program.variables.length(),
     _ => [],
   )
-  for node in 0..<n {
-    if reachable[node] {
+  for node, reachable in search.reachable {
+    if reachable {
       for variable in program.uses[node] {
         use_sites[variable].push(node)
       }
@@ -79,53 +193,16 @@ pub fn trace_values(input : FlowProgram) -> ValueOrigins raise GraphError {
     if sites.is_empty() {
       continue
     }
-    let defined = Array::makei(n, node => {
-      reachable[node] && program.definitions[node].contains(variable)
-    })
+    let defined = search.definition_sites(program, variable)
     for node in sites {
-      let seen = Array::make(n, false)
-      let sources = Array::make(n, false)
-      let work = [node]
-      seen[node] = true
-      let mut cursor = 0
-      let mut requires_entry_value = false
-      while cursor < work.length() {
-        let current = work[cursor]
-        cursor += 1
-        if current == graph.entry && !requires_entry_value {
-          if relations == max_value_origin_relations {
-            raise Invalid("value-origin relation limit of 65536 exceeded")
-          }
-          relations += 1
-          requires_entry_value = true
-        }
-        for previous in pred[current] {
-          if !reachable[previous] {
-            continue
-          }
-          // Test definitions before seen: an already visited use block can
-          // supply its local definition through a self-edge or another cycle.
-          if defined[previous] {
-            if !sources[previous] {
-              if relations == max_value_origin_relations {
-                raise Invalid("value-origin relation limit of 65536 exceeded")
-              }
-              relations += 1
-              sources[previous] = true
-            }
-          } else if !seen[previous] {
-            seen[previous] = true
-            work.push(previous)
-          }
-        }
-      }
-      let definitions = []
-      for source, yes in sources {
-        if yes {
-          definitions.push(source)
-        }
-      }
-      origins.push({ node, variable, definitions, requires_entry_value, })
+      let (origin, count) = search.find_origins(
+        node,
+        variable,
+        defined,
+        max_value_origin_relations - relations,
+      )
+      origins.push(origin)
+      relations += count
     }
   }
   origins.sort_by(fn(left, right) {
@@ -135,7 +212,7 @@ pub fn trace_values(input : FlowProgram) -> ValueOrigins raise GraphError {
       left.variable.compare(right.variable)
     }
   })
-  { program, reachable, origins, }
+  { program, reachable: search.reachable, origins, }
 }
 
 ///|

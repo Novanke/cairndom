@@ -281,6 +281,18 @@ and 512 variables fell from 225.77 to 125.96 MiB. The three fixtures matched
 stdout, stderr and exit status between versions. These measurements apply
 to these fixtures and this host.
 
+In 0.8.5 `trace_use` shares the predecessor walk with `trace_values` but
+only resolves the selected block and variable. Whole-program validation
+still applies. A declared unreachable use returns None. Invalid indices
+and undeclared uses raise GraphError.
+
+The independent forward-state oracle covers 36,864 selected queries across
+12,288 small graph configurations. The existing relation-boundary fixture
+still accepts 65,536 full-report relations and rejects 65,537. Two selected
+queries on the over-limit program return their complete sorted sources and
+incoming-value markers. Tests also cover result ownership and malformed
+facts outside the selected block.
+
 Next useful work follows correctness evidence and real consumers. Candidate
 directions include safe stage ownership/cleanup and explicit data-dependence inputs for program
 slicing. General source-language/IR parsing,

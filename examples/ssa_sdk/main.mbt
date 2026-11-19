@@ -23,6 +23,7 @@ fn main raise {
   assert_eq(uses[0].variable, 0)
   assert_eq(uses[0].definitions, [1, 2])
   assert_false(uses[0].requires_entry_value)
+  assert_eq(@dom.trace_use(program, 3, 0), Some(uses[0]))
   assert_eq(uses[1].variable, 2)
   assert_eq(uses[1].definitions, [])
   assert_true(uses[1].requires_entry_value)

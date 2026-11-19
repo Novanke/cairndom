@@ -46,6 +46,8 @@ pub fn query_json_text(String) -> String raise GraphError
 
 pub fn ssa_plan_json_text(FlowProgram) -> String raise GraphError
 
+pub fn trace_use(FlowProgram, Int32, Int32) -> UseOrigins? raise GraphError
+
 pub fn trace_values(FlowProgram) -> ValueOrigins raise GraphError
 
 // Errors

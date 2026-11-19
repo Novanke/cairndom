@@ -75,7 +75,7 @@ SDK 的 `loop_boundaries(graph)` 为每个自然循环列出进入边、离开�
 ## SDK
 
 ```sh
-moon add Novanke/cairndom@0.8.4
+moon add Novanke/cairndom@0.8.5
 ```
 
 在调用方 `moon.pkg` 中导入 `"Novanke/cairndom" @dom`。可直接构建 `Graph`，或调用 `parse_graph`。核心入口为 `analyze`，也可单独调用 `dominators` 或 `postdominators`。图边使用节点数组索引。只需要自然循环边界或控制依赖证据时，可以直接调用相应查询，结果沿用完整分析的图校验和排序规则。
@@ -177,6 +177,14 @@ let report = origins.json_text()
 ```
 
 每个 `UseOrigins` 包含使用块索引 `node`、变量索引 `variable`、排序后的来源块 `definitions` 和 `requires_entry_value`。结果按块和变量索引排序，索引对应 `origins.program()` 的原始节点与变量顺序。`program()` 和 `uses()` 都返回独立可修改的副本；修改输入或副本，不会改变已保存结果及其 JSON。`is_reachable(node)` 可区分不可达块与没有使用的可达块，越界索引报错。
+
+编辑器只需要解释一个使用点时，可直接用块索引和变量索引查询。SSA SDK 示例用块 3（`join`）和变量 0（`value`）演示这条调用。
+
+```moonbit
+let selected = @dom.trace_use(program, 3, 0)
+```
+
+该调用会校验整个程序，只计算这个使用点的来源。可达的已声明使用返回 `Some(UseOrigins)`，其结果与全量对应项一致，定义块数组由调用方独立持有。不可达块中已声明的使用返回 `None`。越界索引、无效程序、块的 `uses` 中未声明该变量都会报错。全量超过 65,536 条关系时仍可查询单点。
 
 来源沿所有入口可达路径计算，包含永久循环；声明出口不会裁掉这些路径。同一块的使用发生在本地定义之前，但本块上一轮循环的定义可以成为来源。后续定义会阻断更早定义。`requires_entry_value` 表示原始入口值可能到达这个使用点，调用方应提供参数或初值，或按自身语言规则处理；它不直接证明源程序存在未初始化错误。这里不分析值、分支条件、别名或语句顺序，也不转换 IR。
 

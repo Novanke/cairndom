@@ -40,6 +40,9 @@
 - Bound SSA report serialization by checking the remaining 16 MiB budget
   as block and placement records are added. Keep the existing JSON layout
   and both CLI boundary diagnostics.
+- Query a single declared block/variable use through the SDK, with the same
+  last-definition and incoming-value semantics as a full report, even when
+  all sources together exceed the full-report relation cap.
 
 ## Next candidates
 

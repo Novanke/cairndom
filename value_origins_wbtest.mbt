@@ -101,10 +101,15 @@ test "value origins match forward source states on every three-node graph entry 
           // the answer for each possible use independently in one run.
           uses: [[0], [0], [0]],
         }
-        value_origins_test_equal(
-          trace_values(program).uses(),
-          value_origins_test_expected(program),
-        )
+        let expected = value_origins_test_expected(program)
+        value_origins_test_equal(trace_values(program).uses(), expected)
+        let by_node : Array[UseOrigins?] = Array::make(3, None)
+        for origin in expected {
+          by_node[origin.node] = Some(origin)
+        }
+        for node in 0..<3 {
+          assert_eq(trace_use(program, node, 0), by_node[node])
+        }
         cases += 1
       }
     }
@@ -204,6 +209,11 @@ test "value origins own their input every inspection copy and the saved report" 
   value_origins_test_equal(first, expected)
   assert_eq(first[0].variable, 0)
   assert_eq(first[1].variable, 1)
+  let point = trace_use(input, 3, 0).unwrap()
+  assert_eq(point, first[0])
+  assert_eq(trace_use(input, 3, 1), Some(first[1]))
+  point.definitions.clear()
+  assert_eq(trace_use(input, 3, 0), Some(first[0]))
   first[0].definitions.clear()
   assert_eq(first[2].definitions, [1])
   first[0] = {
@@ -272,6 +282,22 @@ test "value origins accept empty facts and reject malformed unreachable facts an
     definitions: [[], []],
     uses: [[], [0]],
   }
+  let uses_in_dead_block : FlowProgram = {
+    ..program,
+    variables: ["x", "unused"],
+    uses: [[0], [0]],
+  }
+  assert_eq(trace_use(uses_in_dead_block, 0, 0), None)
+  for (node, variable) in [(-1, 0), (2, 0), (1, -1), (1, 2), (1, 1), (0, 1)] {
+    assert_true(
+      try {
+        ignore(trace_use(uses_in_dead_block, node, variable))
+        false
+      } catch {
+        Invalid(_) => true
+      },
+    )
+  }
   for
     invalid in [
       { ..program, graph: { ..program.graph, entry: -1, }, },
@@ -285,6 +311,14 @@ test "value origins accept empty facts and reject malformed unreachable facts an
     assert_true(
       try {
         ignore(trace_values(invalid))
+        false
+      } catch {
+        Invalid(_) => true
+      },
+    )
+    assert_true(
+      try {
+        ignore(trace_use(invalid, 1, 0))
         false
       } catch {
         Invalid(_) => true
@@ -349,6 +383,24 @@ test "value origins accept exactly 65536 source relations and reject the next in
     Invalid(message) => message
   }
   assert_eq(error, "value-origin relation limit of 65536 exceeded")
+  assert_eq(
+    trace_use(program, 255, 0),
+    Some({
+      node: 255,
+      variable: 0,
+      definitions: Array::makei(256, source => source + 256),
+      requires_entry_value: false,
+    }),
+  )
+  assert_eq(
+    trace_use(program, 256, 1),
+    Some({
+      node: 256,
+      variable: 1,
+      definitions: [],
+      requires_entry_value: true,
+    }),
+  )
   // A failed second computation cannot damage an already accepted snapshot.
   assert_eq(exact.uses().length(), 511)
 }
