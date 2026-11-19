@@ -17,6 +17,7 @@ def verify_formats_and_errors(checks):
     verify_input_device(checks, path, report)
     verify_stage_inspection(checks, path)
     verify_durable_output(checks, path, out, fixtures)
+    verify_loop_boundaries(checks, fixtures["loop_boundaries"])
     expected_summary = report.copy()
     expected_summary["schema"] = "cairndom.analysis-summary.v1"
     for field in ("control_witnesses", "control_witnesses_complete", "control_witness_limit"):
@@ -213,6 +214,24 @@ def verify_durable_output(checks, graph, legacy, fixtures):
                 require(target.read_bytes() == content, f"{name}: changed report bytes")
             else:
                 require(not target.exists(), f"{name}: unexpected report")
+
+
+def verify_loop_boundaries(checks, cases):
+    for number, case in enumerate(cases):
+        path = checks.put_graph(f"loop-boundary-{number}", case["input"])
+        for expected in case["reports"]:
+            header = expected["header"]
+            options = [f"--header={header}"] if header.startswith("--") else ["--header", header]
+            command = ["loop-boundary", path, *options]
+            stdout = checks.invoke(command)
+            require(json.loads(stdout) == expected, f"wrong loop boundary for {header}")
+            if header == "--inner":
+                target = checks.work / "loop-boundary.out"
+                require(checks.invoke([*command, "--out", target]) == "", "file output wrote stdout")
+                checks.invoke([*command, "--out", target], error=True)
+                require(target.read_bytes() == stdout.encode("utf-8"), "boundary file differs from stdout")
+        if number == 0:
+            checks.bad_arguments("loop-boundary", path)
 
 
 def verify(checks):

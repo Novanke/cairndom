@@ -17,24 +17,26 @@ fn make_graph(
 }
 
 ///|
+fn named_edge_pairs(
+  nodes : Array[String],
+  edges : Array[(Int32, Int32)],
+) -> Json {
+  Json::array(
+    edges.map(edge => {
+      let (from, to) = edge
+      Json::array([Json::string(nodes[from]), Json::string(nodes[to])])
+    }),
+  )
+}
+
+///|
 fn graph_input(graph : @dom.Graph) -> Json {
   object([
     ("schema", Json::string("cairndom.graph.v1")),
     ("nodes", Json::array(graph.nodes.map(Json::string))),
     ("entry", Json::string(graph.nodes[graph.entry])),
     ("exits", index_names(graph.nodes, graph.exits)),
-    (
-      "edges",
-      Json::array(
-        graph.edges.map(edge => {
-          let (from, to) = edge
-          Json::array([
-            Json::string(graph.nodes[from]),
-            Json::string(graph.nodes[to]),
-          ])
-        }),
-      ),
-    ),
+    ("edges", named_edge_pairs(graph.nodes, graph.edges)),
   ])
 }
 
@@ -711,6 +713,83 @@ fn durable_preload() -> String {
 }
 
 ///|
+fn loop_boundary_report(
+  graph : @dom.Graph,
+  header : Int32,
+  boundary : @dom.LoopBoundary?,
+) -> Json {
+  let (entering, leaving, back) = match boundary {
+    Some(value) => (value.entering_edges, value.leaving_edges, value.back_edges)
+    None => ([], [], [])
+  }
+  object([
+    ("schema", Json::string("cairndom.loop-boundary.v1")),
+    ("header", Json::string(graph.nodes[header])),
+    ("found", Json::boolean(boundary is Some(_))),
+    ("entering_edges", named_edge_pairs(graph.nodes, entering)),
+    ("leaving_edges", named_edge_pairs(graph.nodes, leaving)),
+    ("back_edges", named_edge_pairs(graph.nodes, back)),
+  ])
+}
+
+///|
+fn loop_boundary_cases(large : @dom.Graph) -> Json {
+  let nested : @dom.Graph = {
+    nodes: ["entry", "parent", "--inner", "body", "exit", "dead"],
+    entry: 0,
+    exits: [4],
+    edges: [(3, 2), (2, 4), (5, 5), (0, 1), (2, 3), (1, 2), (3, 1), (5, 2)],
+  }
+  let nested_boundary : @dom.LoopBoundary = {
+    header: 2,
+    entering_edges: [(1, 2)],
+    leaving_edges: [(2, 4), (3, 1)],
+    back_edges: [(3, 2)],
+  }
+  // Reverse the existing dense DAG without edges to entry. Adding a chain
+  // gives nested natural loops with membership header..127. Query only n126.
+  let edges = Array::makei(127, node => (node, node + 1))
+  for (from, to) in large.edges {
+    if from != 0 {
+      edges.push((to, from))
+    }
+  }
+  let dense = make_graph(128, edges)
+  let leaving = []
+  for from in 126..<128 {
+    for to in 1..<126 {
+      leaving.push((from, to))
+    }
+  }
+  let dense_boundary : @dom.LoopBoundary = {
+    header: 126,
+    entering_edges: [(125, 126)],
+    leaving_edges: leaving,
+    back_edges: [(127, 126)],
+  }
+  Json::array([
+    object([
+      ("input", graph_input(nested)),
+      (
+        "reports",
+        Json::array([
+          loop_boundary_report(nested, 2, Some(nested_boundary)),
+          loop_boundary_report(nested, 0, None),
+          loop_boundary_report(nested, 5, None),
+        ]),
+      ),
+    ]),
+    object([
+      ("input", graph_input(dense)),
+      (
+        "reports",
+        Json::array([loop_boundary_report(dense, 126, Some(dense_boundary))]),
+      ),
+    ]),
+  ])
+}
+
+///|
 /// Inputs and option matrices for the real-file/process adapter. This package
 /// owns portable cases; the adapter owns paths, processes and fault injection.
 pub fn host_cases() -> Json {
@@ -747,6 +826,7 @@ pub fn host_cases() -> Json {
     ("stdout_program", program_input(make_program(single, [], []))),
     ("large_stdout_graph", graph_input(large)),
     ("ssa_budget", ssa_budget_cases()),
+    ("loop_boundaries", loop_boundary_cases(large)),
     ("durable_reports", durable_reports()),
     ("durable_preload", Json::string(durable_preload())),
     (
@@ -764,6 +844,17 @@ pub fn host_cases() -> Json {
             ["analyze", "$input", "--unknown"],
             ["analyze", "$input", "--format", "json", "--format", "dot"],
             ["analyze", "$input", "--out", "a", "--out", "b"],
+          ]),
+        ),
+        (
+          "loop-boundary",
+          arguments([
+            ["loop-boundary", "$input"],
+            ["loop-boundary", "$input", "--header"],
+            ["loop-boundary", "$input", "--header", "entry", "--header=entry"],
+            ["loop-boundary", "$input", "--header="],
+            ["loop-boundary", "$input", "--header", "entry", "--format", "dot"],
+            ["loop-boundary", "$input", "--header", "unknown"],
           ]),
         ),
         ("plan-ssa", json_arguments("plan-ssa")),

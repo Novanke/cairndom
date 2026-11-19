@@ -329,6 +329,7 @@ priv struct Options {
   format : String
   output : String?
   durable : Bool
+  header : String?
 }
 
 ///|
@@ -338,7 +339,8 @@ fn parse_options(args : Array[String]) -> Options raise CommandError {
       args[0] != "analyze" &&
       args[0] != "plan-ssa" &&
       args[0] != "query" &&
-      args[0] != "trace-values"
+      args[0] != "trace-values" &&
+      args[0] != "loop-boundary"
     ) {
     raise CommandError(
       "usage", "expected analyze, plan-ssa, query or trace-values INPUT; run help for usage",
@@ -348,6 +350,8 @@ fn parse_options(args : Array[String]) -> Options raise CommandError {
   let mut format : String? = None
   let mut output : String? = None
   let mut durable = false
+  let mut header : String? = None
+  let loop_command = args[0] == "loop-boundary"
   let mut literal = false
   let mut index = 1
   while index < args.length() {
@@ -359,6 +363,26 @@ fn parse_options(args : Array[String]) -> Options raise CommandError {
         raise CommandError("usage", "duplicate --durable")
       }
       durable = true
+    } else if !literal &&
+      loop_command &&
+      (arg == "--header" || arg.has_prefix("--header=")) {
+      if header is Some(_) {
+        raise CommandError("usage", "duplicate --header")
+      }
+      let name = match arg.strip_prefix("--header=") {
+        Some(value) => value.to_owned()
+        None => {
+          if index + 1 >= args.length() || args[index + 1].has_prefix("--") {
+            raise CommandError("usage", "missing value for --header")
+          }
+          index += 1
+          args[index]
+        }
+      }
+      if name.is_empty() {
+        raise CommandError("usage", "missing value for --header")
+      }
+      header = Some(name)
     } else if !literal && (arg == "--format" || arg == "--out") {
       if index + 1 >= args.length() ||
         args[index + 1].is_empty() ||
@@ -398,6 +422,9 @@ fn parse_options(args : Array[String]) -> Options raise CommandError {
     Some(path) => path
     None => raise CommandError("usage", "missing input path")
   }
+  if loop_command && header is None {
+    raise CommandError("usage", "missing --header")
+  }
   if args[0] != "analyze" && format == Some("dot") {
     raise CommandError(
       "usage", "this command produces JSON; DOT is only available for analyze",
@@ -415,6 +442,7 @@ fn parse_options(args : Array[String]) -> Options raise CommandError {
     format: format.unwrap_or("json"),
     output,
     durable,
+    header,
   }
 }
 
@@ -422,7 +450,9 @@ fn parse_options(args : Array[String]) -> Options raise CommandError {
 fn execute(args : Array[String]) -> Unit raise {
   let options = parse_options(args)
   let input = io("read", options.input)
-  let rendered = if options.command == "query" {
+  let rendered = if options.header is Some(header) {
+    loop_boundary_report(@cairn.parse_graph(input), header)
+  } else if options.command == "query" {
     @cairn.query_json_text(input)
   } else if options.command == "plan-ssa" {
     @cairn.ssa_plan_json_text(@cairn.parse_program(input))
@@ -481,6 +511,7 @@ fn run_command(args : Array[String]) -> Unit raise {
         args[0] == "plan-ssa" ||
         args[0] == "query" ||
         args[0] == "trace-values" ||
+        args[0] == "loop-boundary" ||
         args[0] == "inspect-stages"
       ) &&
       help.contains(args[1])
@@ -494,6 +525,7 @@ fn run_command(args : Array[String]) -> Unit raise {
           "plan-ssa INPUT [--out NEW_FILE]\n" +
           "query INPUT [--out NEW_FILE]\n" +
           "trace-values INPUT [--out NEW_FILE]\n" +
+          "loop-boundary INPUT --header NODE_ID [--out NEW_FILE] [--durable]\n" +
           "inspect-stages [--] DIRECTORY\n" +
           "help\n" +
           "JSON is the default format. Without --out, the result is written to stdout.\n" +

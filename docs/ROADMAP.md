@@ -46,6 +46,8 @@
 - Request durable file output with `--out` and `--durable`. Report publication,
   parent-directory sync, and owned stage cleanup independently, with the
   existing read-only stage inspection available for residue.
+- Query a selected natural-loop header from the SDK or a graph file. Return
+  ordered entry, exit and back edges even when full expansion exceeds its cap.
 
 ## Next candidates
 

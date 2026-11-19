@@ -86,6 +86,49 @@ fn graph_structure(
 }
 
 ///|
+fn collect_natural_loop(
+  header : Int32,
+  latches : Array[Int32],
+  pred : Array[Array[Int32]],
+  forward : DominatorTree,
+) -> (NaturalLoop, Array[Bool]) {
+  let n = pred.length()
+  latches.sort()
+  let included = Array::make(n, false)
+  let considered = Array::make(n, false)
+  let stack : Array[Int32] = []
+  included[header] = true
+  considered[header] = true
+  for latch in latches {
+    if !included[latch] {
+      included[latch] = true
+      considered[latch] = true
+      stack.push(latch)
+    }
+  }
+  while !stack.is_empty() {
+    let node = stack.pop().unwrap()
+    for previous in pred[node] {
+      if considered[previous] || !forward.reachable[previous] {
+        continue
+      }
+      considered[previous] = true
+      if forward.dominates(header, previous) {
+        included[previous] = true
+        stack.push(previous)
+      }
+    }
+  }
+  let members = []
+  for node in 0..<n {
+    if included[node] {
+      members.push(node)
+    }
+  }
+  ({ header, latches: latches.copy(), members, parent: None, }, included)
+}
+
+///|
 fn natural_loops(
   graph : Graph,
   pred : Array[Array[Int32]],
@@ -106,39 +149,10 @@ fn natural_loops(
     if latches.is_empty() {
       continue
     }
-    latches.sort()
-    let included = Array::make(n, false)
-    let considered = Array::make(n, false)
-    let stack : Array[Int32] = []
-    included[header] = true
-    considered[header] = true
-    for latch in latches {
-      if !included[latch] {
-        included[latch] = true
-        considered[latch] = true
-        stack.push(latch)
-      }
-    }
-    while !stack.is_empty() {
-      let node = stack.pop().unwrap()
-      for previous in pred[node] {
-        if considered[previous] || !forward.reachable[previous] {
-          continue
-        }
-        considered[previous] = true
-        if forward.dominates(header, previous) {
-          included[previous] = true
-          stack.push(previous)
-        }
-      }
-    }
-    let members = []
-    for node in 0..<n {
-      if included[node] {
-        members.push(node)
-      }
-    }
-    loops.push({ header, latches: latches.copy(), members, parent: None, })
+    let (natural_loop, included) = collect_natural_loop(
+      header, latches, pred, forward,
+    )
+    loops.push(natural_loop)
     if nest {
       loop_membership.push(included)
     }

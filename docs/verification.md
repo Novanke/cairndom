@@ -313,6 +313,18 @@ is observed via `inspect-stages`. A separate 137-case CLI byte comparison
 with 0.8.5 covered default reports, file publication, diagnostics and
 read-only inspection. Help adds one line documenting the opt-in flag.
 
+In 0.8.7 `loop_boundary_at` shares membership and edge collection with the
+full boundary API. The selected path computes entry reachability and
+immediate dominators, then expands one header's loop. An independent
+forward-path definition checks 4,608 selected queries across 1,536 small
+graph configurations. The existing 295,119-record dense case still rejects
+full expansion. Header 60 returns one entering edge, 3,600 ordered leaving
+edges and 59 ordered back edges in the same graph.
+
+The file validator checks named edge lists on a nested loop and a separate
+dense graph, plus known non-headers, an unreachable self-loop, a header
+beginning with two hyphens, invalid arguments, and non-overwriting file output.
+
 Next useful work follows correctness evidence and real consumers. Candidate
 directions include safe stage ownership/cleanup and explicit data-dependence inputs for program
 slicing. General source-language/IR parsing,

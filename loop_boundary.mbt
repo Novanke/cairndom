@@ -19,16 +19,7 @@ pub extend LoopBoundary with Debug::{to_repr}
 let max_loop_boundary_edges : Int32 = 65536
 
 ///|
-// The graph and natural loops are already validated and entry-reachable.
-fn loop_boundaries_of(
-  graph : Graph,
-  reachable : Array[Bool],
-  loops : Array[NaturalLoop],
-) -> Array[LoopBoundary] raise GraphError {
-  if loops.is_empty() {
-    return []
-  }
-  let n = graph.nodes.length()
+fn sorted_boundary_edges(graph : Graph) -> Array[(Int32, Int32)] {
   let edges = graph.edges.copy()
   edges.sort_by(fn(left, right) {
     if left.0 != right.0 {
@@ -37,52 +28,80 @@ fn loop_boundaries_of(
       left.1.compare(right.1)
     }
   })
-  let boundaries : Array[LoopBoundary] = []
+  edges
+}
+
+///|
+// The graph and loop are already validated and entry-reachable.
+fn loop_boundary_of(
+  edges : Array[(Int32, Int32)],
+  reachable : Array[Bool],
+  natural_loop : NaturalLoop,
+  budget : Int32,
+) -> (LoopBoundary, Int32) raise GraphError {
+  let n = reachable.length()
   let mut emitted_edges = 0
+  let members = Array::make(n, false)
+  let latches = Array::make(n, false)
+  for node in natural_loop.members {
+    members[node] = true
+  }
+  for latch in natural_loop.latches {
+    latches[latch] = true
+  }
+  let entering_edges = []
+  let leaving_edges = []
+  let back_edges = []
+  for (from, to) in edges {
+    if !reachable[from] || !reachable[to] {
+      continue
+    }
+    if !members[from] && members[to] {
+      if emitted_edges == budget {
+        raise Invalid("loop boundary edge limit of 65536 exceeded")
+      }
+      emitted_edges += 1
+      entering_edges.push((from, to))
+    }
+    if members[from] && !members[to] {
+      if emitted_edges == budget {
+        raise Invalid("loop boundary edge limit of 65536 exceeded")
+      }
+      emitted_edges += 1
+      leaving_edges.push((from, to))
+    }
+    if to == natural_loop.header && latches[from] {
+      if emitted_edges == budget {
+        raise Invalid("loop boundary edge limit of 65536 exceeded")
+      }
+      emitted_edges += 1
+      back_edges.push((from, to))
+    }
+  }
+  (
+    { header: natural_loop.header, entering_edges, leaving_edges, back_edges, },
+    emitted_edges,
+  )
+}
+
+///|
+fn loop_boundaries_of(
+  graph : Graph,
+  reachable : Array[Bool],
+  loops : Array[NaturalLoop],
+) -> Array[LoopBoundary] raise GraphError {
+  if loops.is_empty() {
+    return []
+  }
+  let edges = sorted_boundary_edges(graph)
+  let boundaries = []
+  let mut remaining = max_loop_boundary_edges
   for natural_loop in loops {
-    let members = Array::make(n, false)
-    let latches = Array::make(n, false)
-    for node in natural_loop.members {
-      members[node] = true
-    }
-    for latch in natural_loop.latches {
-      latches[latch] = true
-    }
-    let entering_edges = []
-    let leaving_edges = []
-    let back_edges = []
-    for (from, to) in edges {
-      if !reachable[from] || !reachable[to] {
-        continue
-      }
-      if !members[from] && members[to] {
-        if emitted_edges == max_loop_boundary_edges {
-          raise Invalid("loop boundary edge limit of 65536 exceeded")
-        }
-        emitted_edges += 1
-        entering_edges.push((from, to))
-      }
-      if members[from] && !members[to] {
-        if emitted_edges == max_loop_boundary_edges {
-          raise Invalid("loop boundary edge limit of 65536 exceeded")
-        }
-        emitted_edges += 1
-        leaving_edges.push((from, to))
-      }
-      if to == natural_loop.header && latches[from] {
-        if emitted_edges == max_loop_boundary_edges {
-          raise Invalid("loop boundary edge limit of 65536 exceeded")
-        }
-        emitted_edges += 1
-        back_edges.push((from, to))
-      }
-    }
-    boundaries.push({
-      header: natural_loop.header,
-      entering_edges,
-      leaving_edges,
-      back_edges,
-    })
+    let (boundary, count) = loop_boundary_of(
+      edges, reachable, natural_loop, remaining,
+    )
+    boundaries.push(boundary)
+    remaining -= count
   }
   boundaries
 }
@@ -99,4 +118,35 @@ pub fn loop_boundaries(graph : Graph) -> Array[LoopBoundary] raise GraphError {
   let forward = compute_dominator_tree(succ, pred, graph.entry)
   let loops = natural_loops(graph, pred, forward, nest=false)
   loop_boundaries_of(graph, forward.reachable, loops)
+}
+
+///|
+/// Query the natural-loop boundary for one node index. Return None for an
+/// unreachable node or a node without natural-loop back edges. Invalid graphs
+/// and out-of-range indices raise GraphError. Edge order and ownership match
+/// loop_boundaries. The aggregate limit does not restrict a single loop.
+pub fn loop_boundary_at(
+  graph : Graph,
+  header : Int32,
+) -> LoopBoundary? raise GraphError {
+  let graph = snapshot_graph(graph)
+  if header < 0 || header >= graph.nodes.length() {
+    raise Invalid("loop header index is outside the graph")
+  }
+  let (succ, pred) = adjacency(graph)
+  let forward = compute_dominator_tree(succ, pred, graph.entry)
+  let latches = pred[header].filter(latch => forward.dominates(header, latch))
+  if latches.is_empty() {
+    return None
+  }
+  let (natural_loop, _) = collect_natural_loop(header, latches, pred, forward)
+  let edges = sorted_boundary_edges(graph)
+  // For one loop the three edge classes are disjoint.
+  let (boundary, _) = loop_boundary_of(
+    edges,
+    forward.reachable,
+    natural_loop,
+    edges.length(),
+  )
+  Some(boundary)
 }

@@ -139,6 +139,14 @@ test "nested loop boundaries retain inner exits to the outer loop and merged lat
     }),
   }
   assert_eq(boundaries, loop_boundaries(reordered))
+  for boundary in boundaries {
+    assert_eq(loop_boundary_at(graph, boundary.header), Some(boundary))
+    assert_eq(loop_boundary_at(reordered, boundary.header), Some(boundary))
+  }
+  let selected = loop_boundary_at(graph, 1).unwrap()
+  selected.back_edges.clear()
+  assert_eq(loop_boundary_at(graph, 1), Some(boundaries[0]))
+  assert_eq(loop_boundary_at(graph, 7), None)
 }
 
 ///|
@@ -228,6 +236,22 @@ test "loop boundary API preserves graph validation diagnostics" {
       Invalid(message) => message
     }
     assert_eq(error, expected)
+    let selected_error = try {
+      ignore(loop_boundary_at(invalid, 0))
+      ""
+    } catch {
+      Invalid(message) => message
+    }
+    assert_eq(selected_error, expected)
+  }
+  for header in [-1, 2] {
+    let error = try {
+      ignore(loop_boundary_at(graph, header))
+      ""
+    } catch {
+      Invalid(message) => message
+    }
+    assert_eq(error, "loop header index is outside the graph")
   }
 }
 
@@ -254,6 +278,13 @@ test "all three-node graph boundaries match node-removal and forward-path defini
       let expected = boundary_definition(graph)
       assert_eq(boundaries_from_full_analysis(analyze(graph)), expected)
       assert_eq(loop_boundaries(graph), expected)
+      let by_header : Array[LoopBoundary?] = Array::make(3, None)
+      for boundary in expected {
+        by_header[boundary.header] = Some(boundary)
+      }
+      for header in 0..<3 {
+        assert_eq(loop_boundary_at(graph, header), by_header[header])
+      }
     }
   }
 }
@@ -307,4 +338,11 @@ test "dense nested loops reject global boundary edge expansion before returning 
     Invalid(message) => message
   }
   assert_eq(public_error, "loop boundary edge limit of 65536 exceeded")
+  let selected = loop_boundary_at(graph, 60).unwrap()
+  assert_eq(selected, {
+    header: 60,
+    entering_edges: [(59, 60)],
+    leaving_edges: Array::makei(3600, i => (60 + i / 60, i % 60)),
+    back_edges: Array::makei(59, i => (61 + i, 60)),
+  })
 }

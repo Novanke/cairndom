@@ -33,7 +33,7 @@ node _build/js/release/build/cmd/main/main.js inspect-stages .
 
 `--out` 的目标必须是新文件，父目录须已存在且支持硬链接。完整报告先写入同目录暂存区并同步，再独占发布，拒绝覆盖输入及已有文件。中断或清理失败可能留下 `.cairndom-*` 暂存目录。文件操作面向可信本地目录。POSIX 读取输入文件时，打开前后的路径和文件描述符必须有一致的设备号、inode、大小及修改时间等身份信息。Windows 的路径与句柄可能报告不同口径的设备号，描述符比较沿用兼容处理，路径仍检查实际设备号。
 
-在支持目录同步的本地文件系统上，可给四个分析命令的 `--out` 加上 `--durable`。例如在 Linux 上运行以下命令。
+在支持目录同步的本地文件系统上，可给分析命令的 `--out` 加上 `--durable`。例如在 Linux 上运行以下命令。
 
 ```sh
 node _build/js/release/build/cmd/main/main.js analyze examples/branch-loop.json --out graph-durable.json --durable
@@ -87,16 +87,27 @@ SDK 构建或编辑图后，可用 `graph_json_text(graph)` 生成同一 `cairnd
 
 SDK 的 `loop_boundaries(graph)` 为每个自然循环列出进入边、离开边和返回循环头的回边，按端点索引排序，排除不可达前驱。嵌套循环分别计算边界；包含图入口的循环不会凭空添加进入边。没有离开边仅表示图结构，不构成终止性证明。展开总量限制为 65,536 个边记录，超限会报错，避免返回不完整边界。独立查询只计算入口可达性、直接支配关系和自然循环成员及回边。
 
+只查一个循环时，SDK 可用 `loop_boundary_at(graph, header_index)`。它只展开指定循环，边的内容和排序与全量对应项一致。即使全量超过 65,536 条边记录，单个循环仍可完整返回。合法但不可达的节点或普通节点返回 `None`，越界索引、无效图会报错。
+
+文件 CLI 使用节点 ID 指定循环头。示例里的 `head` 会返回进边 `join → head`、离开边 `head → exit` 和回边 `body → head`。
+
+```sh
+node _build/js/release/build/cmd/main/main.js loop-boundary examples/branch-loop.json --header head
+```
+
+输出为 `cairndom.loop-boundary.v1`。`entering_edges`、`leaving_edges` 和 `back_edges` 中的每条边都是两个节点 ID 的数组。已知节点没有可达自然循环时，`found` 为 `false`，三个边列表为空；未知 ID 会报错。以 `--` 开头的 ID 可用 `--header=NODE_ID` 传入。命令支持 `--out` 和可选的 `--durable`。
+
 ## SDK
 
 ```sh
-moon add Novanke/cairndom@0.8.6
+moon add Novanke/cairndom@0.8.7
 ```
 
 在调用方 `moon.pkg` 中导入 `"Novanke/cairndom" @dom`。可直接构建 `Graph`，或调用 `parse_graph`。核心入口为 `analyze`，也可单独调用 `dominators` 或 `postdominators`。图边使用节点数组索引。只需要自然循环边界或控制依赖证据时，可以直接调用相应查询，结果沿用完整分析的图校验和排序规则。
 
 ```moonbit
 let boundaries = @dom.loop_boundaries(graph)
+let one_boundary = @dom.loop_boundary_at(graph, header_index)
 let witnesses = @dom.control_dependence_witnesses(graph)
 ```
 

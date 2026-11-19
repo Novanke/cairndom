@@ -28,6 +28,8 @@ pub fn liveness(FlowProgram) -> Liveness raise GraphError
 
 pub fn loop_boundaries(Graph) -> Array[LoopBoundary] raise GraphError
 
+pub fn loop_boundary_at(Graph, Int32) -> LoopBoundary? raise GraphError
+
 pub fn parse_graph(String) -> Graph raise GraphError
 
 pub fn parse_program(String) -> FlowProgram raise GraphError
