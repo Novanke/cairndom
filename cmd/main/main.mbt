@@ -24,6 +24,10 @@ extern "js" fn set_exit_code(code : Int32) -> Unit =
   #| code => { process.exitCode = code; }
 
 ///|
+extern "js" fn utf8_byte_length(text : String) -> Int32 =
+  #| text => process.getBuiltinModule('node:buffer').Buffer.byteLength(text, 'utf8')
+
+///|
 extern "js" fn write_stderr(text : String) -> Unit =
   #| text => {
   #|   try {
@@ -73,8 +77,6 @@ extern "js" fn file_io(
   #|   try {
   #|     fs = process.getBuiltinModule('node:fs');
   #|     if (operation === 'stdout') {
-  #|       const bytes = new TextEncoder().encode(text);
-  #|       if (bytes.length > 16777216) throw Error('output exceeds 16 MiB');
   #|       const output = process.stdout;
   #|       let reported = false;
   #|       const fail = error => {
@@ -233,8 +235,12 @@ fn parse_options(args : Array[String]) -> Options raise CommandError {
         if format is Some(_) {
           raise CommandError("usage", "duplicate --format")
         }
-        if args[index] != "json" && args[index] != "dot" {
-          raise CommandError("usage", "--format must be json or dot")
+        if args[index] != "json" &&
+          args[index] != "dot" &&
+          args[index] != "json-summary" {
+          raise CommandError(
+            "usage", "--format must be json, json-summary or dot",
+          )
         }
         format = Some(args[index])
       } else {
@@ -262,6 +268,9 @@ fn parse_options(args : Array[String]) -> Options raise CommandError {
       "usage", "this command produces JSON; DOT is only available for analyze",
     )
   }
+  if args[0] != "analyze" && format == Some("json-summary") {
+    raise CommandError("usage", "json-summary is only available for analyze")
+  }
   { command: args[0], input, format: format.unwrap_or("json"), output, }
 }
 
@@ -277,15 +286,23 @@ fn execute(args : Array[String]) -> Unit raise {
     @cairn.trace_values(@cairn.parse_program(input)).json_text()
   } else {
     let graph = @cairn.parse_graph(input)
-    let analysis = @cairn.analyze(graph)
-    if options.format == "dot" {
-      @cairn.analysis_dot(analysis)
+    if options.format == "json-summary" {
+      let saved = @cairn.prepare_analysis(graph)
+      saved.summary_json_text() catch {
+        @cairn.Invalid(_) =>
+          raise CommandError("limit", "output exceeds 16 MiB")
+      }
     } else {
-      @cairn.analysis_json_text(analysis)
+      let analysis = @cairn.analyze(graph)
+      if options.format == "dot" {
+        @cairn.analysis_dot(analysis)
+      } else {
+        @cairn.analysis_json_text(analysis)
+      }
     }
   }
   let text = rendered + "\n"
-  if @utf8.encode(text).length() > 16777216 {
+  if utf8_byte_length(text) > 16777216 {
     raise CommandError("limit", "output exceeds 16 MiB")
   }
   match options.output {
@@ -325,12 +342,13 @@ fn run_command(args : Array[String]) -> Unit raise {
         "stdout",
         "",
         text="CairnDom — control-flow graph analysis\n" +
-          "analyze INPUT [--format json|dot] [--out NEW_FILE]\n" +
+          "analyze INPUT [--format json|json-summary|dot] [--out NEW_FILE]\n" +
           "plan-ssa INPUT [--out NEW_FILE]\n" +
           "query INPUT [--out NEW_FILE]\n" +
           "trace-values INPUT [--out NEW_FILE]\n" +
           "help\n" +
           "JSON is the default format. Without --out, the result is written to stdout.\n" +
+          "json-summary keeps node-level analysis and omits edge-witness expansion.\n" +
           "Input must be a regular UTF-8 file of at most 2 MiB. Output is limited to 16 MiB.\n" +
           "--out publishes a new file through staged hard-link creation; its parent must exist.\n" +
           "Phi reports contain locations only; callers provide entry values and any IR rewriting.\n" +

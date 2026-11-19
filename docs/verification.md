@@ -196,6 +196,22 @@ input and inspection copy, then checks stable saved JSON/DOT. Windows symlink
 and POSIX FIFO skips remain as documented; matching public Linux and Windows
 CI must pass before publication.
 
+The 0.8.0 defensive source review found that full JSON builds edge witnesses
+before checking report size and that the CLI allocated UTF-8 buffers only to
+count output bytes. The opt-in `cairndom.analysis-summary.v1` format shares all
+node-level analysis fields and skips edge-witness generation. The existing
+dense SDK regression verifies that the summary is exportable and exactly
+matches the full report after removing witness fields and changing the schema.
+The CLI preserves the byte limit, including its final newline, and writes
+stdout without allocating a separate encoding buffer solely for validation.
+The JS host uses [Node.js Buffer.byteLength](https://nodejs.org/download/release/v22.16.0/docs/api/buffer.html#static-method-bufferbytelengthstring-encoding).
+
+Both backends passed all 89 tests and the three SDK examples. The five real-file
+and stdout validators covered the summary schema, file/stdout byte parity,
+destination refusal and command scoping in addition to their existing cases.
+The four default CLI example reports matched the prior version byte for byte.
+Full JSON still materializes before the output limit is enforced.
+
 Next useful work follows correctness evidence and real consumers. Candidate
 directions include safe stage ownership/cleanup and explicit data-dependence inputs for program
 slicing. General source-language/IR parsing,

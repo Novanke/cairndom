@@ -289,6 +289,16 @@ test "oversized saved analysis remains inspectable and DOT exportable while JSON
   )
   assert_eq(saved.dot_text(), analysis_dot(inspected))
   assert_true(saved.dot_text().length() > 0)
+  let summary = @json.parse(saved.summary_json_text())
+  let expected = match @json.parse(legacy) {
+    Object(object) => object
+    _ => fail("expected an analysis report object")
+  }
+  expected["schema"] = Json::string("cairndom.analysis-summary.v1")
+  expected.remove("control_witnesses")
+  expected.remove("control_witnesses_complete")
+  expected.remove("control_witness_limit")
+  assert_eq(summary, Json::object(expected))
   assert_eq(saved.analysis().graph.edges.length(), 2094)
   assert_eq(
     saved.analysis().control_dependencies[49],

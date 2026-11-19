@@ -112,14 +112,9 @@ fn parent_json(graph : Graph, parent : Int32?) -> Json {
 }
 
 ///|
-/// Report indices as original string IDs, with explicit reachability and exit
-/// scope. A virtual postdominator parent is distinguished from no exit path.
-pub fn analysis_json_text(result : Analysis) -> String {
+fn analysis_report_value(result : Analysis, include_witnesses : Bool) -> Json {
   let graph = result.graph
   let n = graph.nodes.length()
-  let (control_witnesses, control_witnesses_complete) = bounded_control_witnesses_of(
-    result,
-  )
   let nodes = []
   for index, name in graph.nodes {
     let post_parent = result.post.immediate[index]
@@ -176,36 +171,53 @@ pub fn analysis_json_text(result : Analysis) -> String {
       ]),
     )
   })
-  Json::object(
-    Map([
-      ("schema", Json::string("cairndom.analysis.v1")),
-      ("entry", Json::string(graph.nodes[graph.entry])),
-      ("exits", names_json(graph, graph.exits)),
-      (
-        "postdominator_scope",
-        Json::string("finite_paths_reaching_declared_exits"),
+  let report = Map([
+    (
+      "schema",
+      Json::string(
+        if include_witnesses {
+          "cairndom.analysis.v1"
+        } else {
+          "cairndom.analysis-summary.v1"
+        },
       ),
-      ("nodes", Json::array(nodes)),
-      ("natural_loops", Json::array(loops)),
-      ("components", Json::array(components)),
-      ("control_witnesses_complete", Json::boolean(control_witnesses_complete)),
-      ("control_witness_limit", Json::number(max_control_witnesses.to_double())),
-      (
-        "control_witnesses",
-        Json::array(
-          control_witnesses.map(witness => {
-            Json::object(
-              Map([
-                ("controller", Json::string(graph.nodes[witness.controller])),
-                ("successor", Json::string(graph.nodes[witness.successor])),
-                ("dependent", Json::string(graph.nodes[witness.dependent])),
-              ]),
-            )
-          }),
-        ),
-      ),
-    ]),
-  ).stringify(indent=2)
+    ),
+    ("entry", Json::string(graph.nodes[graph.entry])),
+    ("exits", names_json(graph, graph.exits)),
+    (
+      "postdominator_scope",
+      Json::string("finite_paths_reaching_declared_exits"),
+    ),
+    ("nodes", Json::array(nodes)),
+    ("natural_loops", Json::array(loops)),
+    ("components", Json::array(components)),
+  ])
+  if include_witnesses {
+    let (witnesses, complete) = bounded_control_witnesses_of(result)
+    report["control_witnesses_complete"] = Json::boolean(complete)
+    report["control_witness_limit"] = Json::number(
+      max_control_witnesses.to_double(),
+    )
+    report["control_witnesses"] = Json::array(
+      witnesses.map(witness => {
+        Json::object(
+          Map([
+            ("controller", Json::string(graph.nodes[witness.controller])),
+            ("successor", Json::string(graph.nodes[witness.successor])),
+            ("dependent", Json::string(graph.nodes[witness.dependent])),
+          ]),
+        )
+      }),
+    )
+  }
+  Json::object(report)
+}
+
+///|
+/// Report indices as original string IDs, with explicit reachability and exit
+/// scope. A virtual postdominator parent is distinguished from no exit path.
+pub fn analysis_json_text(result : Analysis) -> String {
+  analysis_report_value(result, true).stringify(indent=2)
 }
 
 ///|

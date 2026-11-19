@@ -20,9 +20,24 @@ def verify_graphs(checks):
 
 
 def verify_formats_and_errors(checks):
-    graph = checks.reference.run("host-cases")["graph"]
+    fixtures = checks.reference.run("host-cases")
+    graph = fixtures["graph"]
     path, out, original, stdout = checks.file_contract("analyze", "file with spaces 汉字", graph)
     report = json.loads(stdout)
+    expected_summary = report.copy()
+    expected_summary["schema"] = "cairndom.analysis-summary.v1"
+    for field in ("control_witnesses", "control_witnesses_complete", "control_witness_limit"):
+        del expected_summary[field]
+    summary_command = ["analyze", path, "--format", "json-summary"]
+    summary = checks.invoke(summary_command)
+    require(json.loads(summary) == expected_summary, "JSON summary changed graph analysis fields")
+    summary_out = checks.work / "published-summary.json"
+    require(checks.invoke([*summary_command, "--out", summary_out]) == "", "summary --out wrote stdout")
+    require(summary_out.read_bytes() == summary.encode("utf-8"), "summary file and stdout differ")
+    checks.invoke([*summary_command, "--out", summary_out], error=True)
+    require(summary_out.read_bytes() == summary.encode("utf-8"), "summary replaced existing output")
+    program = checks.put_graph("summary-unsupported-command", fixtures["program"])
+    checks.invoke(["plan-ssa", program, "--format", "json-summary"], error=True)
     dot = checks.invoke(["analyze", path, "--format", "dot"])
     require(dot == checks.reference.run("graph", graph)["dot"] + "\n", "DOT output does not describe the input and idoms")
     dot_out = checks.work / "published.dot"

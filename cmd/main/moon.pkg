@@ -1,6 +1,5 @@
 import {
   "Novanke/cairndom" @cairn,
-  "moonbitlang/core/encoding/utf8",
 }
 
 options(

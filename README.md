@@ -11,6 +11,7 @@ CairnDom 是纯 MoonBit 控制流图分析基础库，提供支配树、支配�
 ```sh
 moon build --target js --release --deny-warn
 node _build/js/release/build/cmd/main/main.js analyze examples/branch-loop.json
+node _build/js/release/build/cmd/main/main.js analyze examples/branch-loop.json --format json-summary
 node _build/js/release/build/cmd/main/main.js analyze examples/branch-loop.json --format dot --out graph.dot
 node _build/js/release/build/cmd/main/main.js plan-ssa examples/ssa-branch.json
 node _build/js/release/build/cmd/main/main.js plan-ssa examples/ssa-branch.json --out phi-plan.json
@@ -57,6 +58,8 @@ SDK 构建或编辑图后，可用 `graph_json_text(graph)` 生成同一 `cairnd
 
 边级证据上限为 65,536 条。超过上限时 SDK 报错；JSON 报告保留按索引排序的前缀，并将 `control_witnesses_complete` 标为 `false`，节点级控制依赖仍完整。需要完整边级证据的调用方必须检查此标志。这个上限避免密集分支图生成数百万条重复展开记录。
 
+如果只需要节点级分析，使用 `analyze --format json-summary` 或快照的 `summary_json_text()`。摘要使用独立格式 `cairndom.analysis-summary.v1`，保留可达性、支配关系、控制依赖、自然循环和强连通分量，跳过边级证据的计算与输出。密集图的完整报告若因边级证据过大而无法导出，摘要仍可能适用。两种 JSON 输出都受各自入口的 16 MiB 上限约束。
+
 自然循环由“循环头支配回边来源”定义，同一头的回边合并。多入口 SCC 会单独标记，它们可能没有自然循环头。SCC 的 `multiple_entries` 只描述该分量的入口数，完整的嵌套不可约性分类仍属后续工作。
 
 SDK 的 `loop_boundaries(graph)` 为每个自然循环列出进入边、离开边和返回循环头的回边，按端点索引排序，排除不可达前驱。嵌套循环分别计算边界；包含图入口的循环不会凭空添加进入边。没有离开边仅表示图结构，不构成终止性证明。展开总量限制为 65,536 个边记录，超限会报错，避免返回不完整边界。
@@ -64,7 +67,7 @@ SDK 的 `loop_boundaries(graph)` 为每个自然循环列出进入边、离开�
 ## SDK
 
 ```sh
-moon add Novanke/cairndom@0.7.0
+moon add Novanke/cairndom@0.8.0
 ```
 
 在调用方 `moon.pkg` 中导入 `"Novanke/cairndom" @dom`。可直接构建 `Graph`，或调用 `parse_graph`。核心入口为 `analyze`，也可单独调用 `dominators` 或 `postdominators`。图边使用节点数组索引。

@@ -64,6 +64,20 @@ pub fn AnalysisSnapshot::json_text(self : Self) -> String raise GraphError {
 }
 
 ///|
+/// Export node-level analysis as cairndom.analysis-summary.v1. The summary
+/// keeps node-level control dependencies and skips edge-witness expansion.
+/// Exports exceeding 16 MiB raise GraphError.
+pub fn AnalysisSnapshot::summary_json_text(
+  self : Self,
+) -> String raise GraphError {
+  let text = analysis_report_value(self.stored, false).stringify(indent=2)
+  if text.length() > 16_777_216 {
+    raise Invalid("analysis summary JSON exceeds 16 MiB")
+  }
+  text
+}
+
+///|
 /// Serialize the same saved analysis as DOT, without recomputing analyze.
 /// Validated node/edge limits bound DOT output below the JSON export limit.
 pub fn AnalysisSnapshot::dot_text(self : Self) -> String {

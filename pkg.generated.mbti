@@ -69,6 +69,7 @@ type AnalysisSnapshot
 pub fn AnalysisSnapshot::analysis(Self) -> Analysis
 pub fn AnalysisSnapshot::dot_text(Self) -> String
 pub fn AnalysisSnapshot::json_text(Self) -> String raise GraphError
+pub fn AnalysisSnapshot::summary_json_text(Self) -> String raise GraphError
 
 pub(all) struct Component {
   members : Array[Int32]

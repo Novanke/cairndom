@@ -27,16 +27,25 @@
   the same complete named report through `trace-values` without overwriting files.
 - Prepare an owned full graph-analysis snapshot, inspect deep copies, and export
   the saved JSON/DOT after callers change their input or displayed result.
+- Export a distinct node-level JSON summary without building edge witnesses.
 
 ## Next candidates
 
-Prioritize observed correctness problems and reproducible consumers. The 0.7.0
-review found no new confirmed mathematical bug. It considered owned graph reports
-(now implemented), safe abandoned-stage cleanup and explicit data-dependence
-inputs. The existing mutable Analysis API still requires valid, unmodified
-results to serialize; callers can opt into AnalysisSnapshot for saved reports.
-Safe cleanup of abandoned `.cairndom-*` stages needs explicit ownership markers;
-the current CLI discloses possible leftovers and does not blindly delete them.
+Prioritize observed correctness problems and reproducible consumers.
+
+1. **Report generation.** The summary format skips edge expansion when only node
+   analysis is needed. Full JSON still materializes before its size check.
+   Investigate checking the budget during serialization while preserving default
+   bytes and witness completeness metadata.
+2. **File identity and recovery.** Review platform-specific file identity checks
+   and design read-only discovery of abandoned stages before considering an
+   ownership protocol for cleanup. The current scope is trusted local directories.
+3. **Cost of narrow queries.** Loop-boundary and edge-witness callers still run
+   full analysis. Evaluate dedicated paths and check result parity before any
+   performance claim.
+
+The existing mutable Analysis API requires valid, unmodified results to
+serialize. Callers can use AnalysisSnapshot for saved reports.
 Value origins describe possible sources under the block-use convention, without
 source-language, path-feasibility or alias reasoning. They do not classify an
 incoming value as an initialization error or provide IR transformations.
