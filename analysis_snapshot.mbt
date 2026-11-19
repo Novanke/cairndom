@@ -56,7 +56,7 @@ pub fn AnalysisSnapshot::analysis(self : Self) -> Analysis {
 /// Witness expansion retains its completeness flag and bounded prefix. Exports
 /// exceeding 16 MiB raise GraphError without changing the saved analysis.
 pub fn AnalysisSnapshot::json_text(self : Self) -> String raise GraphError {
-  self.json_text_limit(max_analysis_json_bytes) catch {
+  self.json_text_limit(max_report_json_bytes) catch {
     Invalid(_) => raise Invalid("analysis JSON exceeds 16 MiB")
   }
 }
@@ -69,7 +69,7 @@ pub fn AnalysisSnapshot::json_text_limit(
   self : Self,
   limit : Int32,
 ) -> String raise GraphError {
-  if limit < 0 || limit > max_analysis_json_bytes {
+  if limit < 0 || limit > max_report_json_bytes {
     raise Invalid("analysis JSON byte limit must be between 0 and 16 MiB")
   }
   bounded_analysis_json_text(self.stored, limit)

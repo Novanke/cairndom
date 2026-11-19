@@ -551,6 +551,74 @@ fn json_arguments(command : String) -> Json {
 }
 
 ///|
+fn padded_case_id(prefix : String, index : Int32, width : Int32) -> String {
+  let digits = index.to_string()
+  let id = prefix + String::make(3 - digits.length(), '0') + digits
+  id + String::make(width - id.length(), 'a')
+}
+
+///|
+fn ssa_budget_cases() -> Json {
+  // Every variable is used at the exit, so it is live across the chain.
+  // These ASCII widths put the pretty report at exactly 16 MiB for delta=0.
+  // Only the entry ID occurs once more than another block ID, so moving
+  // one character between those two IDs changes the total by exactly one.
+  let edges = Array::makei(255, node => (node, node + 1))
+  let variables = Array::makei(320, variable => {
+    let width = if variable < 258 {
+      64
+    } else if variable == 258 {
+      6
+    } else {
+      4
+    }
+    padded_case_id("v", variable, width)
+  })
+  let used = Array::makei(320, variable => variable)
+  Json::array(
+    [
+      (-1, "fits", Json::null()),
+      (
+        0,
+        "newline",
+        object([
+          ("error", Json::string("limit")),
+          ("detail", Json::string("output exceeds 16 MiB")),
+        ]),
+      ),
+      (
+        1,
+        "report",
+        object([
+          ("error", Json::string("input")),
+          ("detail", Json::string("SSA plan JSON exceeds 16 MiB")),
+        ]),
+      ),
+    ].map(case => {
+      let (delta, name, error) = case
+      let nodes = Array::makei(256, node => {
+        let width = match node {
+          0 => 63 + delta
+          1 => 63 - delta
+          247 => 33
+          _ => if node < 247 { 64 } else { 4 }
+        }
+        padded_case_id("n", node, width)
+      })
+      let graph : @dom.Graph = { nodes, edges, entry: 0, exits: [255], }
+      object([
+        ("name", Json::string("ssa-budget-" + name)),
+        (
+          "input",
+          program_input(make_program(graph, variables, [(255, [], used)])),
+        ),
+        ("error", error),
+      ])
+    }),
+  )
+}
+
+///|
 /// Inputs and option matrices for the real-file/process adapter. This package
 /// owns portable cases; the adapter owns paths, processes and fault injection.
 pub fn host_cases() -> Json {
@@ -586,6 +654,7 @@ pub fn host_cases() -> Json {
     ("stdout_graph", graph_input(single)),
     ("stdout_program", program_input(make_program(single, [], []))),
     ("large_stdout_graph", graph_input(large)),
+    ("ssa_budget", ssa_budget_cases()),
     (
       "bad_arguments",
       object([

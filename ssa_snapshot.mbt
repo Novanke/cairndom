@@ -49,7 +49,8 @@ pub fn SsaSnapshot::plan(self : Self) -> SsaPlan {
 
 ///|
 /// Export this exact saved computation as cairndom.ssa-plan.v1 without running
-/// liveness or phi planning again. The existing 16 MiB report limit applies.
+/// liveness or phi planning again. Serialization stops at the first fragment
+/// that would exceed 16 MiB. The budget excludes a caller's final newline.
 pub fn SsaSnapshot::json_text(self : Self) -> String raise GraphError {
   bounded_ssa_plan_json_text(self.stored)
 }

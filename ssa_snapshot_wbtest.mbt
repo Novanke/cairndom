@@ -79,7 +79,7 @@ test "SSA snapshot preserves one report after input and every exported array are
   assert_eq(fresh.program.uses, [[0], [], [], [], [1, 0], []])
   assert_eq(fresh.placements[0].variable, 0)
   assert_false(fresh.placements[0].requires_entry_value)
-  assert_eq(ssa_plan_json_value(fresh).stringify(indent=2), before)
+  assert_eq(bounded_ssa_plan_json_text(fresh), before)
 }
 
 ///|

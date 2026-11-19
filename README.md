@@ -75,7 +75,7 @@ SDK 的 `loop_boundaries(graph)` 为每个自然循环列出进入边、离开�
 ## SDK
 
 ```sh
-moon add Novanke/cairndom@0.8.3
+moon add Novanke/cairndom@0.8.4
 ```
 
 在调用方 `moon.pkg` 中导入 `"Novanke/cairndom" @dom`。可直接构建 `Graph`，或调用 `parse_graph`。核心入口为 `analyze`，也可单独调用 `dominators` 或 `postdominators`。图边使用节点数组索引。只需要自然循环边界或控制依赖证据时，可以直接调用相应查询，结果沿用完整分析的图校验和排序规则。
@@ -163,7 +163,7 @@ let inspected = saved.plan()
 let report = saved.json_text()
 ```
 
-`prepare_ssa` 只计算一次活跃性和 phi 规划，内部独立持有完整结果。`plan()` 每次返回可修改的深层副本；修改原始程序或该副本，都不会改变快照及其 JSON。`json_text()` 序列化同一次计算，保留 `cairndom.ssa-plan.v1` 格式和 16 MiB 上限，不会重新规划。大报告仍可通过 `plan()` 检查，导出超过上限时明确报错。
+`prepare_ssa` 只计算一次活跃性和 phi 规划，内部独立持有完整结果。`plan()` 每次返回可修改的深层副本；修改原始程序或该副本，都不会改变快照及其 JSON。`json_text()` 序列化同一次计算，保留 `cairndom.ssa-plan.v1` 格式和 16 MiB 上限，不会重新规划。大报告仍可通过 `plan()` 检查。导出按块和变量逐条生成，追加文本前检查剩余预算。SDK 的 16 MiB 上限包含报告正文，CLI 另将末尾换行计入同一上限。CLI 只有在完整报告符合上限时才写出。
 
 `ssa_plan_json_text(program)` 仍是按当前程序即时计算并导出的便捷入口。快照用于保存已查看的结果，不用于导出对检查副本所做的修改；图或变量事实改变后，需要新的规划时应重新调用 `prepare_ssa`。快照是进程内对象，JSON 报告没有新增反序列化为规划对象的接口。完整的 `examples/ssa_sdk` 会修改原始输入与检查副本，再断言已保存的报告保持一致。
 

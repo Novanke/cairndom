@@ -261,6 +261,26 @@ configurations. Existing nested, irreducible and unreachable graph cases,
 the exact 65,536-witness boundary, capacity errors and graph-validation
 diagnostics also exercise the public paths.
 
+In 0.8.4 the SSA snapshot and CLI share the bounded MoonBit JSON writer.
+It formats one block or placement at a time and checks the remaining bytes
+before each append. The plan remains available for inspection after an
+export failure. The SDK's 16 MiB budget covers the body. The CLI counts
+the trailing newline and keeps the two existing overflow diagnostics.
+
+The file validator checks report bodies of 16 MiB minus one byte, exactly
+16 MiB and 16 MiB plus one byte. For both failures it checks empty stdout,
+the exact diagnostic and exit code, no new output, preserved existing output
+and no staging residue. An external comparison with 0.8.3 matched 43 normal
+SSA reports byte for byte, including 40 independent oracle cases.
+
+On Windows 11 with Node 22.16.0 and moonc 0.10.20+65efd5b93, seven alternating
+process pairs per fixture measured median peak working set. The 16,440,875-byte
+valid CLI report fell from 145.77 to 143.13 MiB. An over-budget report fell
+from 113.79 to 110.84 MiB, and a larger over-budget report with 512 blocks
+and 512 variables fell from 225.77 to 125.96 MiB. The three fixtures matched
+stdout, stderr and exit status between versions. These measurements apply
+to these fixtures and this host.
+
 Next useful work follows correctness evidence and real consumers. Candidate
 directions include safe stage ownership/cleanup and explicit data-dependence inputs for program
 slicing. General source-language/IR parsing,

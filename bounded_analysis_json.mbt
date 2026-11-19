@@ -1,21 +1,22 @@
 ///|
-let max_analysis_json_bytes : Int32 = 16_777_216
+let max_report_json_bytes : Int32 = 16_777_216
 
 ///|
-priv struct AnalysisJsonWriter {
+priv struct BoundedJsonWriter {
   buffer : StringBuilder
   mut remaining : Int32
+  overflow_detail : String
 }
 
 ///|
 // This writer receives only the fixed report vocabulary and JSON made from
-// validated ASCII graph IDs. UTF-16 code units therefore equal UTF-8 bytes.
-fn AnalysisJsonWriter::append(
+// validated ASCII node and variable IDs. UTF-16 code units equal UTF-8 bytes.
+fn BoundedJsonWriter::append(
   self : Self,
   fragment : StringView,
 ) -> Unit raise GraphError {
   if fragment.length() > self.remaining {
-    raise Invalid("analysis JSON exceeds the byte limit")
+    raise Invalid(self.overflow_detail)
   }
   self.remaining -= fragment.length()
   self.buffer.write_view(fragment)
@@ -24,7 +25,7 @@ fn AnalysisJsonWriter::append(
 ///|
 // Render one record with the standard JSON formatter, then add the leading
 // indentation for its position in the report. Only this record is held here.
-fn AnalysisJsonWriter::value(
+fn BoundedJsonWriter::value(
   self : Self,
   value : Json,
   continuation_indent : StringView,
@@ -42,7 +43,7 @@ fn AnalysisJsonWriter::value(
 }
 
 ///|
-fn AnalysisJsonWriter::field(
+fn BoundedJsonWriter::field(
   self : Self,
   name : String,
 ) -> Unit raise GraphError {
@@ -53,7 +54,7 @@ fn AnalysisJsonWriter::field(
 }
 
 ///|
-fn AnalysisJsonWriter::rows(
+fn BoundedJsonWriter::rows(
   self : Self,
   name : String,
   count : Int32,
@@ -77,7 +78,7 @@ fn AnalysisJsonWriter::rows(
 ///|
 // Reuse the quoted IDs across witnesses. Every row has the same three fields
 // and indentation as the legacy formatter, without a Map and line iterator.
-fn AnalysisJsonWriter::witness_rows(
+fn BoundedJsonWriter::witness_rows(
   self : Self,
   graph : Graph,
   witnesses : Array[ControlWitness],
@@ -106,7 +107,11 @@ fn bounded_analysis_json_text(
   result : Analysis,
   limit : Int32,
 ) -> String raise GraphError {
-  let out = { buffer: StringBuilder(), remaining: limit, }
+  let out : BoundedJsonWriter = {
+    buffer: StringBuilder(),
+    remaining: limit,
+    overflow_detail: "analysis JSON exceeds the byte limit",
+  }
   out.append("{\n")
   for (name, value) in analysis_report_fields(result, "cairndom.analysis.v1") {
     out.field(name)

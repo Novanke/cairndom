@@ -37,6 +37,9 @@
   and loop membership. Query edge-level control witnesses using entry
   reachability and immediate postdominators. Both paths retain graph validation,
   ordering and capacity limits.
+- Bound SSA report serialization by checking the remaining 16 MiB budget
+  as block and placement records are added. Keep the existing JSON layout
+  and both CLI boundary diagnostics.
 
 ## Next candidates
 

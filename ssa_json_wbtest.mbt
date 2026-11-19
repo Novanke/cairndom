@@ -153,6 +153,30 @@ test "SSA JSON handles zero variables and rejects malformed mutated programs" {
     definitions: [[]],
     uses: [[]],
   }
+  let expected =
+    #|{
+    #|  "schema": "cairndom.ssa-plan.v1",
+    #|  "entry": "only",
+    #|  "scope": "entry_reachable_all_paths",
+    #|  "use_convention": "before_local_definition",
+    #|  "status": "locations_only",
+    #|  "variables": [],
+    #|  "blocks": [
+    #|    {
+    #|      "id": "only",
+    #|      "reachable": true,
+    #|      "defines": [],
+    #|      "uses": [],
+    #|      "live_in": [],
+    #|      "live_out": [],
+    #|      "phi_variables": []
+    #|    }
+    #|  ],
+    #|  "placements": [],
+    #|  "entry_values_required": [],
+    #|  "entry_value_semantics": "Variables live before entry local definitions require a caller-supplied parameter or initial value, or a missing-initialization diagnostic under the source language's rules."
+    #|}
+  assert_eq(ssa_plan_json_text(program), expected)
   let report = ssa_json_test_report(program)
   assert_eq(ssa_json_test_names(required(report, "variables")), [])
   assert_eq(ssa_json_test_names(required(report, "entry_values_required")), [])
