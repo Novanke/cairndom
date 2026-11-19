@@ -1,16 +1,11 @@
 #!/usr/bin/env python3
 """Exercise trace-values files against the independent forward-state reference."""
 import json
-from host import ROOT, require, run_checks
+from host import require, run_checks
 
 
 def verify(checks):
-    for case in checks.reference.run("value-origins-cases"):
-        checks.check_case("trace-values", case["name"], case["input"], case["expected"])
-    for path in sorted((ROOT / "examples").glob("*.json")):
-        program = json.loads(path.read_text(encoding="utf-8"))
-        if program.get("schema") == "cairndom.program.v1":
-            checks.check_case("trace-values", "example-" + path.stem, program)
+    checks.check_inputs("trace-values", "value-origins-cases", "cairndom.program.v1")
     checks.file_contract("trace-values", "value origins with spaces 汉字",
                          checks.reference.run("host-cases")["program"])
     limits = checks.reference.run("value-origin-limit-cases")

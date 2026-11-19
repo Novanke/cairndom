@@ -33,6 +33,21 @@ node _build/js/release/build/cmd/main/main.js inspect-stages .
 
 `--out` 的目标必须是新文件，父目录须已存在且支持硬链接。完整报告先写入同目录暂存区并同步，再独占发布，拒绝覆盖输入及已有文件。中断或清理失败可能留下 `.cairndom-*` 暂存目录。文件操作面向可信本地目录。POSIX 读取输入文件时，打开前后的路径和文件描述符必须有一致的设备号、inode、大小及修改时间等身份信息。Windows 的路径与句柄可能报告不同口径的设备号，描述符比较沿用兼容处理，路径仍检查实际设备号。
 
+在支持目录同步的本地文件系统上，可给四个分析命令的 `--out` 加上 `--durable`。例如在 Linux 上运行以下命令。
+
+```sh
+node _build/js/release/build/cmd/main/main.js analyze examples/branch-loop.json --out graph-durable.json --durable
+```
+
+分析报告仍按原格式写入新文件。进入文件写出阶段后，stdout 返回一份 `cairndom.durable-output.v1` JSON 状态，`output` 是目标绝对路径。参数、输入和分析错误沿用 stderr 的原有诊断。只用 `--out` 时仍沿用原有文件输出行为。
+
+- `published` 表示独占发布已成功。即使后续操作失败，已发布的文件也会保留。
+- `directory_synced` 表示发布后，系统已确认同步同一个目标父目录。同步在尝试清理暂存后执行，清理失败时也会尝试同步。
+- `stage_created` 和 `stage_cleaned` 分别说明本次是否创建及成功移除自己的暂存目录。创建过时 `stage_path` 记录其绝对路径，否则为 `null`。
+- `publication_error`、`sync_error`、`cleanup_error` 分别记录对应阶段的错误，无错误时为 `null`。发布、同步和清理都成功且三个错误字段均为空时退出码为 0，其余写出状态返回 2。
+
+Windows 的 Node.js CLI 会在创建暂存前拒绝该模式。其他平台须能打开并同步目标父目录，实际同步能力取决于本地文件系统和设备。收到退出码 2 时可先检查 `published`，它可能已经为 `true`。持久化状态记录的是文件系统调用结果，适用于可信本地目录。
+
 报告写入中断后，可运行 `inspect-stages DIRECTORY` 检查原输出文件的父目录。命令仅检查该目录的直接子项，最多扫描 4,096 项，识别名称为 `.cairndom-` 加六位 ASCII 字母或数字的候选，按名称排序，将 `cairndom.stage-inspection.v1` JSON 写到 stdout。以短横线开头的目录名可以写作 `inspect-stages -- DIRECTORY`。
 
 - `empty` 表示空目录，`data_only` 表示只有一个链接数为一的普通 `data` 文件，`data_with_other_links` 表示该文件还有其他硬链接。这三种状态的 `possible_residue` 为 `true`。
@@ -75,7 +90,7 @@ SDK 的 `loop_boundaries(graph)` 为每个自然循环列出进入边、离开�
 ## SDK
 
 ```sh
-moon add Novanke/cairndom@0.8.5
+moon add Novanke/cairndom@0.8.6
 ```
 
 在调用方 `moon.pkg` 中导入 `"Novanke/cairndom" @dom`。可直接构建 `Graph`，或调用 `parse_graph`。核心入口为 `analyze`，也可单独调用 `dominators` 或 `postdominators`。图边使用节点数组索引。只需要自然循环边界或控制依赖证据时，可以直接调用相应查询，结果沿用完整分析的图校验和排序规则。

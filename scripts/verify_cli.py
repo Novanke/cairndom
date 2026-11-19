@@ -4,21 +4,9 @@ import json
 import os
 import tempfile
 from pathlib import Path
-from host import ROOT, require, run_checks
+from host import require, run_checks
 
 INPUT_LIMIT = 2_097_152
-
-
-def verify_graphs(checks):
-    for case in checks.reference.run("graph-cases"):
-        checks.check_case("analyze", case["name"], case["input"], case["expected"])
-    for path in sorted((ROOT / "examples").glob("*.json")):
-        value = json.loads(path.read_text(encoding="utf-8"))
-        if value.get("schema") == "cairndom.graph.v1":
-            checks.check_case("analyze", "example-" + path.stem, value)
-        else:
-            require(value.get("schema") in {"cairndom.program.v1", "cairndom.queries.v1"},
-                    f"Unknown example schema: {path}")
 
 
 def verify_formats_and_errors(checks):
@@ -28,6 +16,7 @@ def verify_formats_and_errors(checks):
     report = json.loads(stdout)
     verify_input_device(checks, path, report)
     verify_stage_inspection(checks, path)
+    verify_durable_output(checks, path, out, fixtures)
     expected_summary = report.copy()
     expected_summary["schema"] = "cairndom.analysis-summary.v1"
     for field in ("control_witnesses", "control_witnesses_complete", "control_witness_limit"):
@@ -193,8 +182,42 @@ def verify_stage_inspection(checks, graph):
                 "inspection changed files or hard links")
 
 
+def verify_durable_output(checks, graph, legacy, fixtures):
+    command = ["analyze", graph, "--durable"]
+    checks.invoke(command, error=True)
+    content = legacy.read_bytes()
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory).resolve()
+        for name, expected in fixtures["durable_reports"].items():
+            if (name == "unsupported" and os.name != "nt" or
+                    expected["published"] and os.name != "posix"):
+                continue
+            target = legacy if name == "existing" else root / name
+            preload = (checks.failure_preload(name, f"const mode = {json.dumps(name)};\n" +
+                                              fixtures["durable_preload"]) if expected["published"] else None)
+            code = 0 if name == "success" else 2
+            result = json.loads(checks.invoke([*command, "--out", target], preload=preload, exit_code=code))
+            stage = result.pop("stage_path")
+            require(Path(result.pop("output")) == target and result == expected, f"{name}: wrong receipt {result}")
+            if expected["stage_created"]:
+                stage = Path(stage)
+                require(stage.parent == root and stage.name.startswith(".cairndom-")
+                        and stage.exists() != expected["stage_cleaned"], f"{name}: wrong stage path {stage}")
+                if not expected["stage_cleaned"]:
+                    checks.invoke(["inspect-stages", root])
+                    require(os.path.samefile(stage / "data", target), "inspection changed retained stage")
+            else:
+                require(stage is None and (target == legacy or not any(root.iterdir())),
+                        f"{name}: unexpected stage path or directory entries")
+            if name == "existing" or expected["published"]:
+                require(target.read_bytes() == content, f"{name}: changed report bytes")
+            else:
+                require(not target.exists(), f"{name}: unexpected report")
+
+
 def verify(checks):
-    verify_graphs(checks)
+    checks.check_inputs("analyze", "graph-cases", "cairndom.graph.v1",
+                        other_schemas=("cairndom.program.v1", "cairndom.queries.v1"))
     verify_formats_and_errors(checks)
     verify_analysis_output_limit(checks)
 

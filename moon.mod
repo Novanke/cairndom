@@ -1,6 +1,6 @@
 name = "Novanke/cairndom"
 
-version = "0.8.5"
+version = "0.8.6"
 
 readme = "README.md"
 

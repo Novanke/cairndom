@@ -43,6 +43,9 @@
 - Query a single declared block/variable use through the SDK, with the same
   last-definition and incoming-value semantics as a full report, even when
   all sources together exceed the full-report relation cap.
+- Request durable file output with `--out` and `--durable`. Report publication,
+  parent-directory sync, and owned stage cleanup independently, with the
+  existing read-only stage inspection available for residue.
 
 ## Next candidates
 

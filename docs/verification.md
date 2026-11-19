@@ -293,6 +293,26 @@ queries on the over-limit program return their complete sorted sources and
 incoming-value markers. Tests also cover result ownership and malformed
 facts outside the selected block.
 
+In 0.8.6 opt-in `--durable` writes the normal report through the exclusive
+hard-link path. It records publication, directory synchronization, and
+owned stage cleanup separately in `cairndom.durable-output.v1`. The output
+parent is opened before staging and rechecked by device and inode. Directory
+sync follows the cleanup attempt, including a failed cleanup after publication.
+The receipt records the host's observations in a trusted local directory.
+A directory sync acknowledges that directory's entries. It is distinct from
+the earlier report file sync and from cleanup itself. See the
+[Linux fsync manual](https://man7.org/linux/man-pages/man2/fsync.2.html#DESCRIPTION)
+and the [Node.js fsyncSync contract](https://nodejs.org/download/release/v22.16.0/docs/api/fs.html#fsfsyncsyncfd).
+
+The real-file validator checks Linux directory fsync ordering, normal report
+bytes, refusal to replace an existing output, and Windows refusal before
+creating a stage. It injects a failed directory sync after publication and
+a failed unlink of this invocation's staged file. Both checks preserve the
+published file and verify the distinct receipt states. The retained stage
+is observed via `inspect-stages`. A separate 137-case CLI byte comparison
+with 0.8.5 covered default reports, file publication, diagnostics and
+read-only inspection. Help adds one line documenting the opt-in flag.
+
 Next useful work follows correctness evidence and real consumers. Candidate
 directions include safe stage ownership/cleanup and explicit data-dependence inputs for program
 slicing. General source-language/IR parsing,

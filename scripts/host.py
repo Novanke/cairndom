@@ -101,6 +101,19 @@ class CliChecks:
         self.graphs += 1
         return path, expected
 
+    def check_inputs(self, command, case_group, schema, *, other_schemas=()):
+        cases = self.reference.run(case_group)
+        for case in cases:
+            self.check_case(command, case["name"], case["input"], case["expected"])
+        for path in sorted((ROOT / "examples").glob("*.json")):
+            value = json.loads(path.read_text(encoding="utf-8"))
+            example_schema = value.get("schema")
+            if example_schema == schema:
+                self.check_case(command, "example-" + path.stem, value)
+            elif other_schemas:
+                require(example_schema in other_schemas, f"Unknown example schema: {path}")
+        return cases
+
     def reject(self, name, payload, command="analyze"):
         path = self.work / f"invalid-{command}-{name}.json"
         if not isinstance(payload, bytes):

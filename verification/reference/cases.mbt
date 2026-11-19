@@ -619,6 +619,98 @@ fn ssa_budget_cases() -> Json {
 }
 
 ///|
+fn durable_report(
+  flags : (Bool, Bool, Bool, Bool),
+  error~ : (String, String)? = None,
+) -> Json {
+  let (published, synced, created, cleaned) = flags
+  let detail = key => {
+    match error {
+      Some((kind, message)) if kind == key => Json::string(message)
+      _ => Json::null()
+    }
+  }
+  object([
+    ("schema", Json::string("cairndom.durable-output.v1")),
+    ("published", Json::boolean(published)),
+    ("directory_synced", Json::boolean(synced)),
+    ("stage_created", Json::boolean(created)),
+    ("stage_cleaned", Json::boolean(cleaned)),
+    ("publication_error", detail("publication")),
+    ("sync_error", detail("sync")),
+    ("cleanup_error", detail("cleanup")),
+  ])
+}
+
+///|
+fn durable_reports() -> Json {
+  object([
+    ("success", durable_report((true, true, true, true))),
+    (
+      "sync",
+      durable_report(
+        (true, false, true, true),
+        error=Some(("sync", "injected directory sync failure")),
+      ),
+    ),
+    (
+      "cleanup",
+      durable_report(
+        (true, true, true, false),
+        error=Some(("cleanup", "injected stage cleanup failure")),
+      ),
+    ),
+    (
+      "existing",
+      durable_report(
+        (false, false, false, false),
+        error=Some(("publication", "output already exists")),
+      ),
+    ),
+    (
+      "unsupported",
+      durable_report(
+        (false, false, false, false),
+        error=Some(("sync", "durable directory sync is unavailable on Windows")),
+      ),
+    ),
+  ])
+}
+
+///|
+fn durable_preload() -> String {
+  (
+    #|const path = process.getBuiltinModule('node:path');
+    #|const link = fs.linkSync, sync = fs.fsyncSync, unlink = fs.unlinkSync;
+    #|let data, parent;
+    #|let directorySyncs = 0;
+    #|fs.linkSync = (source, target) => {
+    #|  link(source, target);
+    #|  data = source;
+    #|  parent = path.dirname(target);
+    #|};
+    #|fs.fsyncSync = fd => {
+    #|  if (data !== undefined) {
+    #|    const actual = fs.fstatSync(fd, {bigint: true});
+    #|    const expected = fs.statSync(parent, {bigint: true});
+    #|    if (!actual.isDirectory() || actual.dev !== expected.dev || actual.ino !== expected.ino ||
+    #|        (mode === 'cleanup') !== fs.existsSync(path.dirname(data))) {
+    #|      throw Error('directory sync used the wrong directory or phase');
+    #|    }
+    #|    directorySyncs++;
+    #|    if (mode === 'sync') throw Error('injected directory sync failure');
+    #|  }
+    #|  return sync(fd);
+    #|};
+    #|fs.unlinkSync = file => {
+    #|  if (mode === 'cleanup' && file === data) throw Error('injected stage cleanup failure');
+    #|  return unlink(file);
+    #|};
+    #|process.on('exit', () => { if (directorySyncs !== 1) process.exitCode = 93; });
+  )
+}
+
+///|
 /// Inputs and option matrices for the real-file/process adapter. This package
 /// owns portable cases; the adapter owns paths, processes and fault injection.
 pub fn host_cases() -> Json {
@@ -655,6 +747,8 @@ pub fn host_cases() -> Json {
     ("stdout_program", program_input(make_program(single, [], []))),
     ("large_stdout_graph", graph_input(large)),
     ("ssa_budget", ssa_budget_cases()),
+    ("durable_reports", durable_reports()),
+    ("durable_preload", Json::string(durable_preload())),
     (
       "bad_arguments",
       object([

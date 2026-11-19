@@ -52,6 +52,12 @@ extern "js" fn file_io(
 ) -> IoResult =
   #| (operation, input, text, stdoutError) => {
   #|   let fs, path, fd, stage, stageId, dataPath, dataId;
+  #|   let parent, parentFd, parentId;
+  #|   const durable = operation === 'write-durable';
+  #|   const receipt = durable ? {
+  #|     error:'', syncError:'', cleanupError:'', outputPath:'', stagePath:'',
+  #|     published:false, directorySynced:false, stageCreated:false, stageCleaned:false,
+  #|   } : null;
   #|   const identity = s => `${process.platform === 'win32' ? 'win' : s.dev}:${s.ino}:${s.birthtimeNs}`;
   #|   const stamp = (s, device = s.dev) => `${device}:${s.ino}:${s.size}:${s.mtimeNs}:${s.ctimeNs}`;
   #|   const closeOwned = () => {
@@ -72,6 +78,13 @@ extern "js" fn file_io(
   #|         throw error;
   #|       }
   #|       if (observed.isSymbolicLink()) throw Error('symbolic links are unsupported');
+  #|     }
+  #|   };
+  #|   const directoryIdentity = s => s.isDirectory() ? String(s.dev) + ':' + String(s.ino) : null;
+  #|   const checkParent = () => {
+  #|     checkLinks(parent);
+  #|     if (directoryIdentity(fs.lstatSync(parent, {bigint:true})) !== parentId) {
+  #|       throw Error('output directory identity changed');
   #|     }
   #|   };
   #|   try {
@@ -98,7 +111,8 @@ extern "js" fn file_io(
   #|     }
   #|     path = process.getBuiltinModule('node:path');
   #|     const target = path.resolve(input);
-  #|     checkLinks(target, operation === 'write');
+  #|     if (receipt) receipt.outputPath = target;
+  #|     checkLinks(target, operation === 'write' || durable);
   #|     if (operation === 'inspect-stages') {
   #|       const stat = file => fs.lstatSync(file, {bigint:true});
   #|       const root = stat(target);
@@ -182,7 +196,7 @@ extern "js" fn file_io(
   #|       closeOwned();
   #|       return {error:'', text:new TextDecoder('utf-8', {fatal:true}).decode(bytes)};
   #|     }
-  #|     if (operation !== 'write') throw Error('unknown file operation');
+  #|     if (operation !== 'write' && !durable) throw Error('unknown file operation');
   #|     const bytes = new TextEncoder().encode(text);
   #|     if (bytes.length > 16777216) throw Error('output exceeds 16 MiB');
   #|     try {
@@ -191,7 +205,32 @@ extern "js" fn file_io(
   #|     } catch (error) {
   #|       if (error.code !== 'ENOENT') throw error;
   #|     }
-  #|     stage = fs.mkdtempSync(path.join(path.dirname(target), '.cairndom-'));
+  #|     parent = path.dirname(target);
+  #|     if (receipt) {
+  #|       if (process.platform === 'win32') {
+  #|         receipt.syncError = 'durable directory sync is unavailable on Windows';
+  #|         return receipt;
+  #|       }
+  #|       try {
+  #|         parentId = directoryIdentity(fs.lstatSync(parent, {bigint:true}));
+  #|         if (parentId === null) throw Error('output parent is not a directory');
+  #|         const {O_RDONLY, O_DIRECTORY, O_NOFOLLOW, O_NONBLOCK} = fs.constants;
+  #|         parentFd = fs.openSync(parent, O_RDONLY | (O_DIRECTORY || 0) |
+  #|           (O_NOFOLLOW || 0) | (O_NONBLOCK || 0));
+  #|         if (directoryIdentity(fs.fstatSync(parentFd, {bigint:true})) !== parentId) {
+  #|           throw Error('output directory identity changed');
+  #|         }
+  #|         checkParent();
+  #|       } catch (error) {
+  #|         receipt.syncError = String(error.message || error);
+  #|         return receipt;
+  #|       }
+  #|     }
+  #|     stage = fs.mkdtempSync(path.join(parent, '.cairndom-'));
+  #|     if (receipt) {
+  #|       receipt.stageCreated = true;
+  #|       receipt.stagePath = stage;
+  #|     }
   #|     stageId = identity(fs.lstatSync(stage, {bigint:true}));
   #|     dataPath = path.join(stage, 'data');
   #|     fd = fs.openSync(dataPath, 'wx', 0o644);
@@ -209,14 +248,23 @@ extern "js" fn file_io(
   #|         identity(fs.lstatSync(dataPath, {bigint:true})) !== dataId) {
   #|       throw Error('output stage changed');
   #|     }
+  #|     if (receipt) checkParent();
   #|     fs.linkSync(dataPath, target);
-  #|     return {error:''};
+  #|     if (receipt) receipt.published = true;
+  #|     return receipt || {error:''};
   #|   } catch (error) {
-  #|     return {error:String(error.message || error)};
+  #|     const detail = String(error.message || error);
+  #|     if (!receipt) return {error:detail};
+  #|     receipt.error = detail;
+  #|     return receipt;
   #|   } finally {
-  #|     if (fd !== undefined) { try { closeOwned(); } catch {} }
+  #|     if (fd !== undefined) {
+  #|       try { closeOwned(); }
+  #|       catch (error) { if (receipt) receipt.cleanupError = String(error.message || error); }
+  #|     }
   #|     if (stage && stageId) {
   #|       try {
+  #|         if (receipt) checkParent();
   #|         checkLinks(stage);
   #|         const directory = fs.lstatSync(stage, {bigint:true});
   #|         if (directory.isDirectory() && identity(directory) === stageId) {
@@ -225,9 +273,36 @@ extern "js" fn file_io(
   #|             const data = fs.lstatSync(dataPath, {bigint:true});
   #|             if (data.isFile() && identity(data) === dataId) fs.unlinkSync(dataPath);
   #|           }
-  #|           if (fs.readdirSync(stage).length === 0) fs.rmdirSync(stage);
+  #|           if (fs.readdirSync(stage).length === 0) {
+  #|             fs.rmdirSync(stage);
+  #|             if (receipt) receipt.stageCleaned = true;
+  #|           }
   #|         }
-  #|       } catch {}
+  #|       } catch (error) {
+  #|         if (receipt && !receipt.cleanupError) receipt.cleanupError = String(error.message || error);
+  #|       }
+  #|     }
+  #|     if (receipt && stage && !receipt.stageCleaned && !receipt.cleanupError) {
+  #|       receipt.cleanupError = 'output stage could not be cleaned safely';
+  #|     }
+  #|     if (receipt && parentFd !== undefined) {
+  #|       // Sync the parent after cleanup, even if cleanup left some residue.
+  #|       // The previously published target is never removed on later errors.
+  #|       try {
+  #|         if (receipt.published) {
+  #|           checkParent();
+  #|           fs.fsyncSync(parentFd);
+  #|           checkParent();
+  #|           receipt.directorySynced = true;
+  #|         }
+  #|       } catch (error) {
+  #|         receipt.syncError = String(error.message || error);
+  #|       } finally {
+  #|         try { fs.closeSync(parentFd); }
+  #|         catch (error) {
+  #|           if (!receipt.syncError) receipt.syncError = String(error.message || error);
+  #|         }
+  #|       }
   #|     }
   #|   }
   #| }
@@ -253,6 +328,7 @@ priv struct Options {
   input : String
   format : String
   output : String?
+  durable : Bool
 }
 
 ///|
@@ -271,12 +347,18 @@ fn parse_options(args : Array[String]) -> Options raise CommandError {
   let mut input : String? = None
   let mut format : String? = None
   let mut output : String? = None
+  let mut durable = false
   let mut literal = false
   let mut index = 1
   while index < args.length() {
     let arg = args[index]
     if !literal && arg == "--" {
       literal = true
+    } else if !literal && arg == "--durable" {
+      if durable {
+        raise CommandError("usage", "duplicate --durable")
+      }
+      durable = true
     } else if !literal && (arg == "--format" || arg == "--out") {
       if index + 1 >= args.length() ||
         args[index + 1].is_empty() ||
@@ -324,7 +406,16 @@ fn parse_options(args : Array[String]) -> Options raise CommandError {
   if args[0] != "analyze" && format == Some("json-summary") {
     raise CommandError("usage", "json-summary is only available for analyze")
   }
-  { command: args[0], input, format: format.unwrap_or("json"), output, }
+  if durable && output is None {
+    raise CommandError("usage", "--durable requires --out")
+  }
+  {
+    command: args[0],
+    input,
+    format: format.unwrap_or("json"),
+    output,
+    durable,
+  }
 }
 
 ///|
@@ -361,6 +452,7 @@ fn execute(args : Array[String]) -> Unit raise {
     raise CommandError("limit", "output exceeds 16 MiB")
   }
   match options.output {
+    Some(path) if options.durable => write_durable_output(path, text)
     Some(path) => ignore(io("write", path, text~))
     None => ignore(io("stdout", "", text~))
   }
@@ -408,6 +500,7 @@ fn run_command(args : Array[String]) -> Unit raise {
           "json-summary keeps node-level analysis and omits edge-witness expansion.\n" +
           "Input must be a regular UTF-8 file of at most 2 MiB. Output is limited to 16 MiB.\n" +
           "--out publishes a new file through staged hard-link creation; its parent must exist.\n" +
+          "--durable requires --out, syncs the parent directory when supported and reports status as JSON.\n" +
           "Phi reports contain locations only; callers provide entry values and any IR rewriting.\n" +
           "Value origins describe possible last definitions and caller-supplied incoming values.\n" +
           "Node.js 22.16+ is required. Exit 0 means analysis produced; exit 2 means input or I/O error.\n",
