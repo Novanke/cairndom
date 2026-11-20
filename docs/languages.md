@@ -5,21 +5,21 @@ in MoonBit and checked on Wasm GC and JavaScript. JavaScript FFI is confined to
 the process/filesystem adapters in the production CLI and verification command.
 Python handles real files, subprocesses, pipes and host fault injection.
 
-The 0.8.8 source snapshot below uses canonical Git blob bytes, not build outputs
+The 0.8.9 source snapshot below uses canonical Git blob bytes, not build outputs
 or working-tree line endings. Comments are included. Generated `.mbti`, JSON
 fixtures and documentation are excluded from source rows.
 
 | Source category | Files | Bytes | Nonblank lines |
 | --- | ---: | ---: | ---: |
-| Production MoonBit, including CLI adapter | 24 | 108,265 | 3,310 |
-| Core MoonBit regression tests | 18 | 132,917 | 4,163 |
+| Production MoonBit, including CLI adapter | 24 | 111,321 | 3,400 |
+| Core MoonBit regression tests | 18 | 135,112 | 4,230 |
 | MoonBit SDK examples | 3 | 4,750 | 136 |
 | Independent MoonBit verification implementation | 5 | 59,452 | 1,917 |
 | Verification selftests | 1 | 1,068 | 22 |
-| Python host adapter and entry points | 6 | 32,819 | 576 |
+| Python host adapter and entry points | 6 | 33,400 | 585 |
 
 For comparison with the repository language bar, exclude examples (which GitHub
-excluded from prior measurements). This leaves 301,702 MoonBit bytes, 32,819
+excluded from prior measurements). This leaves 306,953 MoonBit bytes, 33,400
 Python bytes and the 325-byte module manifest that GitHub previously classified
 as AMPL: approximately **90.10% MoonBit by that byte metric**. GitHub can classify
 files differently or update its cached bar later; its public languages API is
@@ -32,6 +32,8 @@ Do not interpret the language bar as a claim that every source byte is MoonBit,
 or count tests/reference tools as production functionality. No Linguist overrides
 are used; `.gitattributes` only sets text line endings.
 
+The 0.8.8 public measurement was 301,702 MoonBit bytes, 32,819 Python bytes
+and 325 AMPL bytes (90.10% MoonBit), confirmed before this update.
 The 0.8.7 public measurement was 300,175 MoonBit bytes, 32,819 Python bytes
 and 325 AMPL bytes (90.06% MoonBit), confirmed before this update.
 The 0.8.6 source measurement was 292,167 MoonBit bytes, 31,770 Python bytes

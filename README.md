@@ -18,6 +18,7 @@ node _build/js/release/build/cmd/main/main.js plan-ssa examples/ssa-branch.json 
 node _build/js/release/build/cmd/main/main.js query examples/queries.json
 node _build/js/release/build/cmd/main/main.js trace-values examples/value-origins.json
 node _build/js/release/build/cmd/main/main.js trace-values examples/value-origins.json --out value-origins.json
+node _build/js/release/build/cmd/main/main.js trace-use examples/value-origins.json --node join --variable value
 node _build/js/release/build/cmd/main/main.js inspect-stages .
 ```
 
@@ -100,7 +101,7 @@ node _build/js/release/build/cmd/main/main.js loop-boundary examples/branch-loop
 ## SDK
 
 ```sh
-moon add Novanke/cairndom@0.8.8
+moon add Novanke/cairndom@0.8.9
 ```
 
 在调用方 `moon.pkg` 中导入 `"Novanke/cairndom" @dom`。可直接构建 `Graph`，或调用 `parse_graph`。核心入口为 `analyze`，也可单独调用 `dominators` 或 `postdominators`。图边使用节点数组索引。只需要自然循环边界或控制依赖证据时，可以直接调用相应查询，结果沿用完整分析的图校验和排序规则。
@@ -211,6 +212,8 @@ let selected = @dom.trace_use(program, 3, 0)
 ```
 
 该调用会校验整个程序，只计算这个使用点的来源。可达的已声明使用返回 `Some(UseOrigins)`，其结果与全量对应项一致，定义块数组由调用方独立持有。不可达块中已声明的使用返回 `None`。越界索引、无效程序、块的 `uses` 中未声明该变量都会报错。全量超过 65,536 条关系时仍可查询单点。
+
+从文件查询时，`trace-use INPUT --node NODE_ID --variable VARIABLE_ID` 直接使用块名和变量名。SDK 的 `trace_use_json_text(program, "join", "value")` 返回相同的 `cairndom.use-origin.v1` 报告。`origin` 是 `trace-values` 中对应的完整一行，声明了使用但块不可达时为 `null`。例如上面的 CLI 调用返回来源块 `left`，同时标记可能需要入口值。未知名字和未声明的使用按输入错误处理。名字以 `--` 开头时可写作 `--node=NODE_ID` 或 `--variable=VARIABLE_ID`。保存报告可用 `--out NEW_FILE`，也可按需加 `--durable`。
 
 来源沿所有入口可达路径计算，包含永久循环；声明出口不会裁掉这些路径。同一块的使用发生在本地定义之前，但本块上一轮循环的定义可以成为来源。后续定义会阻断更早定义。`requires_entry_value` 表示原始入口值可能到达这个使用点，调用方应提供参数或初值，或按自身语言规则处理；它不直接证明源程序存在未初始化错误。这里不分析值、分支条件、别名或语句顺序，也不转换 IR。
 

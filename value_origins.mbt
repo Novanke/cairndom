@@ -134,6 +134,15 @@ pub fn trace_use(
   variable : Int32,
 ) -> UseOrigins? raise GraphError {
   validate_program(program)
+  trace_use_checked(program, node, variable)
+}
+
+///|
+fn trace_use_checked(
+  program : FlowProgram,
+  node : Int32,
+  variable : Int32,
+) -> UseOrigins? raise GraphError {
   if node < 0 || node >= program.graph.nodes.length() {
     raise Invalid("value-origin node index is outside the graph")
   }

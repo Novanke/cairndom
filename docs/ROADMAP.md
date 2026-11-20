@@ -50,6 +50,9 @@
   ordered entry, exit and back edges even when full expansion exceeds its cap.
 - Index immediate dominators or postdominators for named query batches,
   omitting frontier computation while preserving query text and diagnostics.
+- Query a declared use by block and variable name from a program file or the
+  SDK. The selected row is available even when the full report exceeds its
+  relation limit.
 
 ## Next candidates
 

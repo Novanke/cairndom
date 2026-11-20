@@ -21,6 +21,15 @@ def verify(checks):
     require(output.read_bytes() == stdout.encode("utf-8"),
             "capacity file differs from complete stdout report")
     checks.reject("value-origin-over-limit", limits["over_limit"], "trace-values")
+    selected = checks.put_graph("selected-use", limits["over_limit"])
+    row = report["uses"][1]
+    node, variable = row["node"], row["variable"]
+    command = ["trace-use", selected, "--node", node, "--variable", variable]
+    require(json.loads(checks.invoke(command)) == {
+        "schema": "cairndom.use-origin.v1", "node": node, "variable": variable, "origin": row,
+    }, "selected use differs after full-report overflow")
+    checks.invoke([*command, "--out", output], error=True)
+    require(output.read_bytes() == stdout.encode("utf-8"), "trace-use overwrote a report")
 
 
 if __name__ == "__main__":

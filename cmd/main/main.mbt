@@ -323,13 +323,52 @@ fn io(
 }
 
 ///|
+priv enum Selection {
+  LoopHeader(String)
+  ValueUse(String, String)
+}
+
+///|
 priv struct Options {
   command : String
   input : String
   format : String
   output : String?
   durable : Bool
-  header : String?
+  selection : Selection?
+}
+
+///|
+fn is_selector(arg : String, flag : String) -> Bool {
+  arg == flag || arg.has_prefix(flag + "=")
+}
+
+///|
+// Parse both `--flag ID` and `--flag=ID`. The latter can name an ID
+// that begins with two hyphens without consuming another option.
+fn read_selector(
+  args : Array[String],
+  index : Int32,
+  flag : String,
+  previous : String?,
+) -> (String?, Int32) raise CommandError {
+  if previous is Some(_) {
+    raise CommandError("usage", "duplicate " + flag)
+  }
+  let (name, last) = match args[index].strip_prefix(flag + "=") {
+    Some(value) => (value.to_owned(), index)
+    None => {
+      let next = index + 1
+      if next >= args.length() || args[next].has_prefix("--") {
+        raise CommandError("usage", "missing value for " + flag)
+      }
+      (args[next], next)
+    }
+  }
+  if name.is_empty() {
+    raise CommandError("usage", "missing value for " + flag)
+  }
+  (Some(name), last)
 }
 
 ///|
@@ -340,6 +379,7 @@ fn parse_options(args : Array[String]) -> Options raise CommandError {
       args[0] != "plan-ssa" &&
       args[0] != "query" &&
       args[0] != "trace-values" &&
+      args[0] != "trace-use" &&
       args[0] != "loop-boundary"
     ) {
     raise CommandError(
@@ -351,7 +391,10 @@ fn parse_options(args : Array[String]) -> Options raise CommandError {
   let mut output : String? = None
   let mut durable = false
   let mut header : String? = None
+  let mut node : String? = None
+  let mut variable : String? = None
   let loop_command = args[0] == "loop-boundary"
+  let use_command = args[0] == "trace-use"
   let mut literal = false
   let mut index = 1
   while index < args.length() {
@@ -363,26 +406,18 @@ fn parse_options(args : Array[String]) -> Options raise CommandError {
         raise CommandError("usage", "duplicate --durable")
       }
       durable = true
-    } else if !literal &&
-      loop_command &&
-      (arg == "--header" || arg.has_prefix("--header=")) {
-      if header is Some(_) {
-        raise CommandError("usage", "duplicate --header")
-      }
-      let name = match arg.strip_prefix("--header=") {
-        Some(value) => value.to_owned()
-        None => {
-          if index + 1 >= args.length() || args[index + 1].has_prefix("--") {
-            raise CommandError("usage", "missing value for --header")
-          }
-          index += 1
-          args[index]
-        }
-      }
-      if name.is_empty() {
-        raise CommandError("usage", "missing value for --header")
-      }
-      header = Some(name)
+    } else if !literal && loop_command && is_selector(arg, "--header") {
+      let (value, last) = read_selector(args, index, "--header", header)
+      header = value
+      index = last
+    } else if !literal && use_command && is_selector(arg, "--node") {
+      let (value, last) = read_selector(args, index, "--node", node)
+      node = value
+      index = last
+    } else if !literal && use_command && is_selector(arg, "--variable") {
+      let (value, last) = read_selector(args, index, "--variable", variable)
+      variable = value
+      index = last
     } else if !literal && (arg == "--format" || arg == "--out") {
       if index + 1 >= args.length() ||
         args[index + 1].is_empty() ||
@@ -422,8 +457,19 @@ fn parse_options(args : Array[String]) -> Options raise CommandError {
     Some(path) => path
     None => raise CommandError("usage", "missing input path")
   }
-  if loop_command && header is None {
-    raise CommandError("usage", "missing --header")
+  let selection = if loop_command {
+    match header {
+      Some(name) => Some(LoopHeader(name))
+      None => raise CommandError("usage", "missing --header")
+    }
+  } else if use_command {
+    match (node, variable) {
+      (None, _) => raise CommandError("usage", "missing --node")
+      (_, None) => raise CommandError("usage", "missing --variable")
+      (Some(name), Some(id)) => Some(ValueUse(name, id))
+    }
+  } else {
+    None
   }
   if args[0] != "analyze" && format == Some("dot") {
     raise CommandError(
@@ -442,7 +488,7 @@ fn parse_options(args : Array[String]) -> Options raise CommandError {
     format: format.unwrap_or("json"),
     output,
     durable,
-    header,
+    selection,
   }
 }
 
@@ -450,8 +496,10 @@ fn parse_options(args : Array[String]) -> Options raise CommandError {
 fn execute(args : Array[String]) -> Unit raise {
   let options = parse_options(args)
   let input = io("read", options.input)
-  let rendered = if options.header is Some(header) {
+  let rendered = if options.selection is Some(LoopHeader(header)) {
     loop_boundary_report(@cairn.parse_graph(input), header)
+  } else if options.selection is Some(ValueUse(node, variable)) {
+    @cairn.trace_use_json_text(@cairn.parse_program(input), node, variable)
   } else if options.command == "query" {
     @cairn.query_json_text(input)
   } else if options.command == "plan-ssa" {
@@ -511,6 +559,7 @@ fn run_command(args : Array[String]) -> Unit raise {
         args[0] == "plan-ssa" ||
         args[0] == "query" ||
         args[0] == "trace-values" ||
+        args[0] == "trace-use" ||
         args[0] == "loop-boundary" ||
         args[0] == "inspect-stages"
       ) &&
@@ -525,6 +574,7 @@ fn run_command(args : Array[String]) -> Unit raise {
           "plan-ssa INPUT [--out NEW_FILE]\n" +
           "query INPUT [--out NEW_FILE]\n" +
           "trace-values INPUT [--out NEW_FILE]\n" +
+          "trace-use INPUT --node NODE_ID --variable VARIABLE_ID [--out NEW_FILE] [--durable]\n" +
           "loop-boundary INPUT --header NODE_ID [--out NEW_FILE] [--durable]\n" +
           "inspect-stages [--] DIRECTORY\n" +
           "help\n" +

@@ -334,6 +334,20 @@ exercises both index roots, long ancestor jumps and virtual exit serialization.
 An external comparison with 0.8.7 matched 54 CLI cases byte for byte,
 including both query directions, dense graphs, diagnostics and file output.
 
+In 0.8.9 `trace-use` and `trace_use_json_text` reuse the selected-use analysis
+and the full report's row serializer. The report includes the requested names
+and the complete matching row. A declared unreachable use has a null row.
+The existing program validation, input diagnostics, and atomic new-file output
+apply. MoonBit tests check exact JSON, invalid names, undeclared uses, and an
+over-limit program with 256 ordered definitions for one use. The real-file
+test compares a selected row from an over-limit file with its corresponding
+full-report row from the exact-limit fixture and verifies output refusal.
+On Windows with moonc 0.10.20+65efd5b93 and Node 22.16.0, all 91 test blocks
+passed on Wasm GC and JS, alongside the SDK examples and 441 real process
+invocations. A separate 0.8.8 comparison matched 52 legacy CLI cases byte for
+byte. The new CLI was also checked with hyphen-prefixed IDs, an unreachable use,
+invalid selectors, and successful publication followed by overwrite refusal.
+
 Next useful work follows correctness evidence and real consumers. Candidate
 directions include safe stage ownership/cleanup and explicit data-dependence inputs for program
 slicing. General source-language/IR parsing,

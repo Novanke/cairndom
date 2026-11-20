@@ -204,6 +204,31 @@ test "value origins own their input every inspection copy and the saved report" 
   let saved = trace_values(input)
   let expected = value_origins_test_expected(input)
   let report = saved.json_text()
+  let selected_json = trace_use_json_text(input, "join", "x")
+  let expected_json =
+    #|{
+    #|  "schema": "cairndom.use-origin.v1",
+    #|  "node": "join",
+    #|  "variable": "x",
+    #|  "origin": {
+    #|    "node": "join",
+    #|    "variable": "x",
+    #|    "definition_blocks": [
+    #|      "left"
+    #|    ],
+    #|    "requires_entry_value": true
+    #|  }
+    #|}
+  assert_eq(selected_json, expected_json)
+  let selected_fields = match @json.parse(selected_json) {
+    Object(object) => object
+    _ => fail("expected a selected-use report object")
+  }
+  let full_rows = match @json.parse(report) {
+    Object(object) => items(required(object, "uses"), max_program_associations)
+    _ => fail("expected a full value-origin report object")
+  }
+  assert_eq(required(selected_fields, "origin"), full_rows[0])
   let first = saved.uses()
   let second = saved.uses()
   value_origins_test_equal(first, expected)
@@ -288,6 +313,31 @@ test "value origins accept empty facts and reject malformed unreachable facts an
     uses: [[0], [0]],
   }
   assert_eq(trace_use(uses_in_dead_block, 0, 0), None)
+  let unreachable_json =
+    #|{
+    #|  "schema": "cairndom.use-origin.v1",
+    #|  "node": "dead",
+    #|  "variable": "x",
+    #|  "origin": null
+    #|}
+  assert_eq(
+    trace_use_json_text(uses_in_dead_block, "dead", "x"),
+    unreachable_json,
+  )
+  for
+    (node, variable, expected) in [
+      ("missing", "x", "unknown value-origin node: missing"),
+      ("entry", "missing", "unknown value-origin variable: missing"),
+      ("dead", "unused", "value-origin use is not declared in the block"),
+    ] {
+    let error = try {
+      ignore(trace_use_json_text(uses_in_dead_block, node, variable))
+      "accepted"
+    } catch {
+      Invalid(message) => message
+    }
+    assert_eq(error, expected)
+  }
   for (node, variable) in [(-1, 0), (2, 0), (1, -1), (1, 2), (1, 1), (0, 1)] {
     assert_true(
       try {
@@ -400,6 +450,23 @@ test "value origins accept exactly 65536 source relations and reject the next in
       definitions: [],
       requires_entry_value: true,
     }),
+  )
+  let json = trace_use_json_text(program, "n255", "x")
+  let origin = match @json.parse(json) {
+    Object(object) =>
+      fields(required(object, "origin"), [
+        "node", "variable", "definition_blocks", "requires_entry_value",
+      ])
+    _ => fail("expected a selected-use report object")
+  }
+  assert_eq(required(origin, "node"), Json::string("n255"))
+  assert_eq(required(origin, "variable"), Json::string("x"))
+  assert_eq(required(origin, "requires_entry_value"), Json::boolean(false))
+  assert_eq(
+    required(origin, "definition_blocks"),
+    Json::array(
+      Array::makei(256, index => Json::string("n" + (256 + index).to_string())),
+    ),
   )
   // A failed second computation cannot damage an already accepted snapshot.
   assert_eq(exact.uses().length(), 511)
