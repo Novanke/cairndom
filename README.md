@@ -100,7 +100,7 @@ node _build/js/release/build/cmd/main/main.js loop-boundary examples/branch-loop
 ## SDK
 
 ```sh
-moon add Novanke/cairndom@0.8.7
+moon add Novanke/cairndom@0.8.8
 ```
 
 在调用方 `moon.pkg` 中导入 `"Novanke/cairndom" @dom`。可直接构建 `Graph`，或调用 `parse_graph`。核心入口为 `analyze`，也可单独调用 `dominators` 或 `postdominators`。图边使用节点数组索引。只需要自然循环边界或控制依赖证据时，可以直接调用相应查询，结果沿用完整分析的图校验和排序规则。
@@ -155,7 +155,7 @@ let shared_region = post.nearest_common([left_index, right_index])
 
 `postdominators(graph)` 保留完整图校验，但不计算正向支配树、控制依赖、循环或强连通分量。结果与 `analyze(graph).post` 相同，继续采用前述有限出口路径语义。根索引是 `graph.nodes.length()`，数组长度是原节点数加一；没有入口可达的声明出口时，仅虚拟根可达。不可达的出口或前驱不会参与结果。返回数组独立持有数据，可以交给 `index_dominance` 再做多次查询。这里缩小了实际执行的分析范围，不作未经测量的耗时承诺。
 
-文件批量查询使用 `cairndom.queries.v1`：包含 `graph`、`tree`（`forward` 或 `post`）和 `queries`。每项为 `{"operation":"dominates","ancestor":"entry","node":"join"}` 或 `{"operation":"nearest_common","nodes":["left","right"]}`。`query` 命令只建立一次索引；样例中两个分支的最近公共支配节点是 `entry`，`join` 和 `exit` 的是 `join`。JSON 入口也可直接通过 SDK 的 `query_json_text` 调用。
+文件批量查询使用 `cairndom.queries.v1`：包含 `graph`、`tree`（`forward` 或 `post`）和 `queries`。每项为 `{"operation":"dominates","ancestor":"entry","node":"join"}` 或 `{"operation":"nearest_common","nodes":["left","right"]}`。`query` 命令用直接支配树或直接后支配树建立一次索引，跳过支配边界计算；样例中两个分支的最近公共支配节点是 `entry`，`join` 和 `exit` 的是 `join`。JSON 入口也可直接通过 SDK 的 `query_json_text` 调用。
 
 `tree: "post"` 的 SDK JSON 与 CLI 查询现在直接使用 `postdominators`，已有输入格式、输出格式、顺序及边界限制保持兼容；`analyze` 仍返回完整分析。
 

@@ -16,21 +16,27 @@ struct DominanceIndex {
 /// that supplied dominance/frontier sets correspond to an original graph.
 pub fn index_dominance(tree : Dominance) -> DominanceIndex raise GraphError {
   validate_dominance(tree)
+  index_dominator_tree(tree.root, tree.parent_tree())
+}
+
+///|
+// The parent tree comes from graph analysis or a validated public Dominance.
+fn index_dominator_tree(root : Int32, tree : DominatorTree) -> DominanceIndex {
   let n = tree.reachable.length()
   let reachable = tree.reachable.copy()
   let parents = Array::makei(n, node => tree.immediate[node].unwrap_or(node))
   let children : Array[Array[Int32]] = Array::makei(n, _ => [])
   for node in 0..<n {
-    if reachable[node] && node != tree.root {
+    if reachable[node] && node != root {
       children[parents[node]].push(node)
     }
   }
   let entered = Array::make(n, -1)
   let left = Array::make(n, -1)
   let depth = Array::make(n, -1)
-  let stack = [(tree.root, false)]
+  let stack = [(root, false)]
   let mut clock = 0
-  depth[tree.root] = 0
+  depth[root] = 0
   while !stack.is_empty() {
     let (node, expanded) = stack.pop().unwrap()
     if expanded {
@@ -55,7 +61,7 @@ pub fn index_dominance(tree : Dominance) -> DominanceIndex raise GraphError {
     let previous = ancestors[level - 1]
     ancestors.push(Array::makei(n, node => previous[previous[node]]))
   }
-  { root_node: tree.root, reachable, entered, left, depth, ancestors, }
+  { root_node: root, reachable, entered, left, depth, ancestors, }
 }
 
 ///|

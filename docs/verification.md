@@ -325,6 +325,15 @@ The file validator checks named edge lists on a nested loop and a separate
 dense graph, plus known non-headers, an unreachable self-loop, a header
 beginning with two hyphens, invalid arguments, and non-overwriting file output.
 
+In 0.8.8 named query batches build their immutable index directly from
+immediate parents and reachability. Forward queries root at the graph entry;
+post queries root at the virtual exit of the finite-exit-path graph. The
+public index constructor still validates caller-supplied parent and frontier
+arrays before indexing. A 512-node reversed chain with two terminal exits
+exercises both index roots, long ancestor jumps and virtual exit serialization.
+An external comparison with 0.8.7 matched 54 CLI cases byte for byte,
+including both query directions, dense graphs, diagnostics and file output.
+
 Next useful work follows correctness evidence and real consumers. Candidate
 directions include safe stage ownership/cleanup and explicit data-dependence inputs for program
 slicing. General source-language/IR parsing,

@@ -107,12 +107,18 @@ pub fn query_json_text(input : String) -> String raise GraphError {
     operands += count
     queries.push(query)
   }
-  let tree = if tree_kind == "forward" {
-    dominators(graph)
+  // These operands only need the parent topology of the validated graph.
+  let post = tree_kind == "post"
+  let root = if post { graph.nodes.length() } else { graph.entry }
+  let (succ, pred) = if post {
+    exit_path_adjacency(graph, entry_reachability(graph))
   } else {
-    postdominators(graph)
+    adjacency(graph)
   }
-  let index = index_dominance(tree)
+  let index = index_dominator_tree(
+    root,
+    compute_dominator_tree(succ, pred, root),
+  )
   let answers = []
   for query in queries {
     answers.push(batch_answer_json(query, graph, index))
@@ -124,10 +130,10 @@ pub fn query_json_text(input : String) -> String raise GraphError {
       (
         "scope",
         Json::string(
-          if tree_kind == "forward" {
-            "entry_reachable"
-          } else {
+          if post {
             "finite_paths_reaching_declared_exits"
+          } else {
+            "entry_reachable"
           },
         ),
       ),

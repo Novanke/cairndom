@@ -219,6 +219,32 @@ test "post query answers distinguish virtual exit from empty and unreachable reg
 }
 
 ///|
+test "named query batches distinguish entry and virtual roots at the graph limit" {
+  let edges = [(2, 0), (2, 1)]
+  for node in 3..<512 {
+    edges.push((node, node - 1))
+  }
+  let graph : Graph = {
+    nodes: Array::makei(512, node => "n" + node.to_string()),
+    edges,
+    entry: 511,
+    exits: [0, 1],
+  }
+  let exits = ["n0", "n1"]
+  let chain = ["n511", "n200", "n3"]
+  let queries = [query_test_nearest(exits), query_test_nearest(chain)]
+  let forward = query_test_report(query_test_request(graph, "forward", queries))
+  let forward_answers = items(required(forward, "answers"), 2)
+  assert_eq(text(required(forward, "entry")), "n511")
+  query_test_check_nearest(forward_answers[0], exits, true, Some("n2"), false)
+  query_test_check_nearest(forward_answers[1], chain, true, Some("n511"), false)
+  let post = query_test_report(query_test_request(graph, "post", queries))
+  let post_answers = items(required(post, "answers"), 2)
+  query_test_check_nearest(post_answers[0], exits, true, None, true)
+  query_test_check_nearest(post_answers[1], chain, true, Some("n3"), false)
+}
+
+///|
 test "query parsing rejects missing extra duplicate mistyped and late invalid operands" {
   let good =
     #|{"schema":"cairndom.queries.v1","graph":{"schema":"cairndom.graph.v1","nodes":["n","other","dead"],"entry":"n","exits":["other"],"edges":[["n","other"]]},"tree":"forward","queries":[{"operation":"dominates","ancestor":"n","node":"other"},{"operation":"nearest_common","nodes":["other","n","other"]}]}

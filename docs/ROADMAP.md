@@ -48,6 +48,8 @@
   existing read-only stage inspection available for residue.
 - Query a selected natural-loop header from the SDK or a graph file. Return
   ordered entry, exit and back edges even when full expansion exceeds its cap.
+- Index immediate dominators or postdominators for named query batches,
+  omitting frontier computation while preserving query text and diagnostics.
 
 ## Next candidates
 
