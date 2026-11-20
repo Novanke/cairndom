@@ -24,6 +24,8 @@ node _build/js/release/build/cmd/main/main.js inspect-stages .
 
 样例报告中，`left` 和 `right` 的支配边界都是 `join`，`head` 与 `body` 形成一个以 `head` 为头的自然循环，`dead` 不可达。蓝色虚线 DOT 边是直接支配关系，普通边保留原始控制流。DOT 是图描述文件，可由支持该格式的工具进一步渲染。
 
+只需要渲染图时，`analyze --format dot` 和 SDK 的 `graph_dot(graph)` 都只计算入口可达性和直接支配关系。已有完整分析结果时，可继续用 `analysis_dot(result)` 或快照的 `dot_text()` 导出同样的 DOT。
+
 `plan-ssa` 的样例中，两个分支定义 `value` 与 `unused`，汇合块仅使用 `value` 和 `parameter`。输出会为 `value` 在 `join` 安排候选，为未使用的 `unused` 删除候选，并将 `parameter` 列入 `entry_values_required`。报告的 `status` 为 `locations_only`，其中同时给出各块活跃集合和按变量分组的候选；不会生成重命名后的指令或可执行程序。该命令只输出 JSON，并复用相同的输入校验与新文件独占发布约定。
 
 `trace-values` 读取同一 `cairndom.program.v1` 格式，解释每个可达使用点的可能来源。新样例中只有 `left` 分支定义 `value`，因此 `join` 的使用既可能来自 `left`，也可能需要原始入口值；`parameter` 需要调用方提供入口值。`join` 随后定义 `value`，所以 `tail` 的使用只来自 `join`。`dead` 被列入不可达块，不参与来源。这可以帮助分析器定位需要参数或初值的具体使用块。
@@ -101,7 +103,7 @@ node _build/js/release/build/cmd/main/main.js loop-boundary examples/branch-loop
 ## SDK
 
 ```sh
-moon add Novanke/cairndom@0.8.9
+moon add Novanke/cairndom@0.8.10
 ```
 
 在调用方 `moon.pkg` 中导入 `"Novanke/cairndom" @dom`。可直接构建 `Graph`，或调用 `parse_graph`。核心入口为 `analyze`，也可单独调用 `dominators` 或 `postdominators`。图边使用节点数组索引。只需要自然循环边界或控制依赖证据时，可以直接调用相应查询，结果沿用完整分析的图校验和排序规则。

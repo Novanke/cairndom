@@ -18,6 +18,8 @@ pub fn dominates(Dominance, Int32, Int32) -> Bool raise GraphError
 
 pub fn dominators(Graph) -> Dominance raise GraphError
 
+pub fn graph_dot(Graph) -> String raise GraphError
+
 pub fn graph_json_text(Graph) -> String raise GraphError
 
 pub fn index_dominance(Dominance) -> DominanceIndex raise GraphError

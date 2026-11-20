@@ -17,6 +17,7 @@ fn main raise {
   assert_eq(result.control_dependencies[1], [0])
   let report = saved.json_text()
   let dot = saved.dot_text()
+  assert_eq(@dom.graph_dot(graph), dot)
   let site_names = sites.map(i => graph.nodes[i]).join(", ")
   // An editor may mutate both the input and its displayed result. The saved
   // computation still exports the same graph and analysis that was inspected.

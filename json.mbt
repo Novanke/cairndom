@@ -257,17 +257,30 @@ pub fn analysis_json_text(result : Analysis) -> String {
 /// A DOT graph showing original edges and dashed immediate-dominator edges.
 /// Node IDs use the validated ASCII identifier grammar.
 pub fn analysis_dot(result : Analysis) -> String {
-  let graph = result.graph
+  render_dominance_dot(result.graph, result.forward.parent_tree())
+}
+
+///|
+/// Validate a graph and export DOT with entry reachability and immediate
+/// dominators. Output matches analysis_dot(analyze(graph)).
+pub fn graph_dot(input : Graph) -> String raise GraphError {
+  let graph = snapshot_graph(input)
+  let (succ, pred) = adjacency(graph)
+  render_dominance_dot(graph, compute_dominator_tree(succ, pred, graph.entry))
+}
+
+///|
+fn render_dominance_dot(graph : Graph, forward : DominatorTree) -> String {
   let out = StringBuilder()
   out.write_string("digraph CairnDom {\n  rankdir=TB;\n")
   for index, name in graph.nodes {
-    let style = if result.forward.reachable[index] { "solid" } else { "dotted" }
+    let style = if forward.reachable[index] { "solid" } else { "dotted" }
     out.write_string("  \"\{name}\" [style=\{style}];\n")
   }
   for (from, to) in graph.edges {
     out.write_string("  \"\{graph.nodes[from]}\" -> \"\{graph.nodes[to]}\";\n")
   }
-  for index, parent in result.forward.immediate {
+  for index, parent in forward.immediate {
     if parent is Some(dominator) {
       out.write_string(
         "  \"\{graph.nodes[dominator]}\" -> \"\{graph.nodes[index]}\" [style=dashed,color=blue,label=\"idom\"];\n",

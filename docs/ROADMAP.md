@@ -53,6 +53,8 @@
 - Query a declared use by block and variable name from a program file or the
   SDK. The selected row is available even when the full report exceeds its
   relation limit.
+- Render DOT from the graph and its immediate dominators, through the CLI or
+  SDK, with the same output as the full-analysis renderer.
 
 ## Next candidates
 

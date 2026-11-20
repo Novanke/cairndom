@@ -67,6 +67,7 @@ test "analysis snapshot saves exact JSON and DOT after every exported array is c
   let dot = saved.dot_text()
   assert_eq(json, analysis_json_text(expected))
   assert_eq(dot, analysis_dot(expected))
+  assert_eq(graph_dot(input), dot)
   assert_eq(expected.loops.length(), 2)
   assert_true(
     expected.loops.any(natural_loop => natural_loop.parent is Some(_)),
@@ -115,6 +116,14 @@ test "analysis snapshot saves exact JSON and DOT after every exported array is c
   analysis_snapshot_test_equal(saved.analysis(), expected)
   assert_eq(saved.json_text(), json)
   assert_eq(saved.dot_text(), dot)
+}
+
+///|
+test "direct DOT validates declared exits even though they are not rendered" {
+  let graph = analysis_snapshot_test_graph()
+  graph.exits.push(3)
+  let diagnostic = graph_dot(graph) catch { Invalid(detail) => detail }
+  assert_eq(diagnostic, "declared exits must have no outgoing edges")
 }
 
 ///|

@@ -515,7 +515,7 @@ fn execute(args : Array[String]) -> Unit raise {
           raise CommandError("limit", "output exceeds 16 MiB")
       }
     } else if options.format == "dot" {
-      @cairn.analysis_dot(@cairn.analyze(graph))
+      @cairn.graph_dot(graph)
     } else {
       let saved = @cairn.prepare_analysis(graph)
       // Reserve the final LF inside the existing CLI byte limit.

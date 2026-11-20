@@ -348,6 +348,22 @@ invocations. A separate 0.8.8 comparison matched 52 legacy CLI cases byte for
 byte. The new CLI was also checked with hyphen-prefixed IDs, an unreachable use,
 invalid selectors, and successful publication followed by overwrite refusal.
 
+In 0.8.10 `graph_dot` and the CLI's `--format dot` path validate the graph
+and compute only entry reachability and immediate dominators. The direct and
+analysis-based exports use one renderer. The SDK test covers a nonzero entry,
+an unreachable predecessor, nested cycles, and rejection of a nonterminal
+declared exit. An external comparison matched 115 CLI DOT cases byte for byte
+against both the independent reference and 0.8.9. The comparison also checked
+19 invalid-input diagnostics, new-file publication, and overwrite refusal.
+
+On Windows with Node 22.16.0 and moonc 0.10.20+65efd5b93, DOT generation on one
+already parsed 512-node, 8,192-edge graph took a median 16.298 ms per call
+in 0.8.9 and 1.582 ms in 0.8.10. Nine alternating process pairs, each with
+10 warmups and 24 timed calls, measured the optimized JS analysis and rendering
+paths. This excludes process startup, input parsing, and file I/O. Both
+versions produced identical DOT bytes. The local release suite also passed
+92 tests per backend, all SDK examples, and 441 real CLI invocations.
+
 Next useful work follows correctness evidence and real consumers. Candidate
 directions include safe stage ownership/cleanup and explicit data-dependence inputs for program
 slicing. General source-language/IR parsing,
