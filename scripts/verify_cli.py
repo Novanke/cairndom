@@ -127,6 +127,15 @@ def verify_analysis_output_limit(checks):
     require(summary["schema"] == "cairndom.analysis-summary.v1" and
             summary["nodes"][49]["control_dependencies"] == controllers,
             "summary lost node-level control dependencies for the oversized analysis")
+    controller, successor = nodes[48:50]
+    command = ["control-witness", path, "--controller", controller, f"--successor={successor}"]
+    require(json.loads(checks.invoke(command)) == {
+        "schema": "cairndom.control-witness.v1", "controller": controller,
+        "successor": successor, "dependents": nodes[49:127],
+    }, "selected edge lost witnesses past the full-report capacity")
+    checks.invoke([*command, "--out", existing], error=True)
+    require(set(checks.work.rglob("*")) == before and existing.read_bytes() == b"keep this output\n",
+            "selected edge changed existing output or left a stage")
 
 
 def verify_input_device(checks, path, report):

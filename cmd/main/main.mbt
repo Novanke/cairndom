@@ -326,6 +326,7 @@ fn io(
 priv enum Selection {
   LoopHeader(String)
   ValueUse(String, String)
+  ControlEdge(String, String)
 }
 
 ///|
@@ -380,6 +381,7 @@ fn parse_options(args : Array[String]) -> Options raise CommandError {
       args[0] != "query" &&
       args[0] != "trace-values" &&
       args[0] != "trace-use" &&
+      args[0] != "control-witness" &&
       args[0] != "loop-boundary"
     ) {
     raise CommandError(
@@ -390,11 +392,14 @@ fn parse_options(args : Array[String]) -> Options raise CommandError {
   let mut format : String? = None
   let mut output : String? = None
   let mut durable = false
-  let mut header : String? = None
-  let mut node : String? = None
-  let mut variable : String? = None
-  let loop_command = args[0] == "loop-boundary"
-  let use_command = args[0] == "trace-use"
+  let mut primary : String? = None
+  let mut secondary : String? = None
+  let (primary_flag, secondary_flag) = match args[0] {
+    "loop-boundary" => ("--header", "")
+    "trace-use" => ("--node", "--variable")
+    "control-witness" => ("--controller", "--successor")
+    _ => ("", "")
+  }
   let mut literal = false
   let mut index = 1
   while index < args.length() {
@@ -406,17 +411,17 @@ fn parse_options(args : Array[String]) -> Options raise CommandError {
         raise CommandError("usage", "duplicate --durable")
       }
       durable = true
-    } else if !literal && loop_command && is_selector(arg, "--header") {
-      let (value, last) = read_selector(args, index, "--header", header)
-      header = value
+    } else if !literal &&
+      !primary_flag.is_empty() &&
+      is_selector(arg, primary_flag) {
+      let (value, last) = read_selector(args, index, primary_flag, primary)
+      primary = value
       index = last
-    } else if !literal && use_command && is_selector(arg, "--node") {
-      let (value, last) = read_selector(args, index, "--node", node)
-      node = value
-      index = last
-    } else if !literal && use_command && is_selector(arg, "--variable") {
-      let (value, last) = read_selector(args, index, "--variable", variable)
-      variable = value
+    } else if !literal &&
+      !secondary_flag.is_empty() &&
+      is_selector(arg, secondary_flag) {
+      let (value, last) = read_selector(args, index, secondary_flag, secondary)
+      secondary = value
       index = last
     } else if !literal && (arg == "--format" || arg == "--out") {
       if index + 1 >= args.length() ||
@@ -457,19 +462,16 @@ fn parse_options(args : Array[String]) -> Options raise CommandError {
     Some(path) => path
     None => raise CommandError("usage", "missing input path")
   }
-  let selection = if loop_command {
-    match header {
-      Some(name) => Some(LoopHeader(name))
-      None => raise CommandError("usage", "missing --header")
-    }
-  } else if use_command {
-    match (node, variable) {
-      (None, _) => raise CommandError("usage", "missing --node")
-      (_, None) => raise CommandError("usage", "missing --variable")
-      (Some(name), Some(id)) => Some(ValueUse(name, id))
-    }
-  } else {
-    None
+  let selection = match (args[0], primary, secondary) {
+    ("loop-boundary", Some(header), _) => Some(LoopHeader(header))
+    ("trace-use", Some(node), Some(variable)) => Some(ValueUse(node, variable))
+    ("control-witness", Some(controller), Some(successor)) =>
+      Some(ControlEdge(controller, successor))
+    (_, None, _) if !primary_flag.is_empty() =>
+      raise CommandError("usage", "missing " + primary_flag)
+    (_, _, None) if !secondary_flag.is_empty() =>
+      raise CommandError("usage", "missing " + secondary_flag)
+    _ => None
   }
   if args[0] != "analyze" && format == Some("dot") {
     raise CommandError(
@@ -500,6 +502,8 @@ fn execute(args : Array[String]) -> Unit raise {
     loop_boundary_report(@cairn.parse_graph(input), header)
   } else if options.selection is Some(ValueUse(node, variable)) {
     @cairn.trace_use_json_text(@cairn.parse_program(input), node, variable)
+  } else if options.selection is Some(ControlEdge(controller, successor)) {
+    control_witness_report(@cairn.parse_graph(input), controller, successor)
   } else if options.command == "query" {
     @cairn.query_json_text(input)
   } else if options.command == "plan-ssa" {
@@ -560,6 +564,7 @@ fn run_command(args : Array[String]) -> Unit raise {
         args[0] == "query" ||
         args[0] == "trace-values" ||
         args[0] == "trace-use" ||
+        args[0] == "control-witness" ||
         args[0] == "loop-boundary" ||
         args[0] == "inspect-stages"
       ) &&
@@ -575,6 +580,7 @@ fn run_command(args : Array[String]) -> Unit raise {
           "query INPUT [--out NEW_FILE]\n" +
           "trace-values INPUT [--out NEW_FILE]\n" +
           "trace-use INPUT --node NODE_ID --variable VARIABLE_ID [--out NEW_FILE] [--durable]\n" +
+          "control-witness INPUT --controller NODE_ID --successor NODE_ID [--out NEW_FILE] [--durable]\n" +
           "loop-boundary INPUT --header NODE_ID [--out NEW_FILE] [--durable]\n" +
           "inspect-stages [--] DIRECTORY\n" +
           "help\n" +

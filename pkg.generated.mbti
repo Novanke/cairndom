@@ -14,6 +14,8 @@ pub fn analyze(Graph) -> Analysis raise GraphError
 
 pub fn control_dependence_witnesses(Graph) -> Array[ControlWitness] raise GraphError
 
+pub fn control_dependence_witnesses_at(Graph, Int32, Int32) -> Array[ControlWitness] raise GraphError
+
 pub fn dominates(Dominance, Int32, Int32) -> Bool raise GraphError
 
 pub fn dominators(Graph) -> Dominance raise GraphError

@@ -87,6 +87,14 @@ fn check_witness_definition(graph : Graph) -> Unit raise {
   let expected = witness_definition(graph)
   assert_eq(witness_triples(actual), expected)
   assert_eq(witness_triples(control_dependence_witnesses(graph)), expected)
+  for (controller, successor) in graph.edges {
+    assert_eq(
+      witness_triples(
+        control_dependence_witnesses_at(graph, controller, successor),
+      ),
+      expected.filter(row => row.0 == controller && row.1 == successor),
+    )
+  }
   let controllers = Array::makei(graph.nodes.length(), _ => [])
   for dependent in 0..<graph.nodes.length() {
     for controller in 0..<graph.nodes.length() {
@@ -199,6 +207,38 @@ test "witness API preserves graph validation diagnostics" {
       Invalid(message) => message
     }
     assert_eq(error, expected)
+    let selected_error = try {
+      ignore(control_dependence_witnesses_at(invalid, -1, -1))
+      ""
+    } catch {
+      Invalid(message) => message
+    }
+    assert_eq(selected_error, expected)
+  }
+}
+
+///|
+test "selected control witness requires both valid endpoints and an original directed edge" {
+  let graph : Graph = {
+    nodes: ["entry", "next"],
+    edges: [(0, 1)],
+    entry: 0,
+    exits: [],
+  }
+  assert_eq(control_dependence_witnesses_at(graph, 0, 1), [])
+  for
+    (controller, successor, expected) in [
+      (-1, 1, "control witness controller index is outside the graph"),
+      (0, 2, "control witness successor index is outside the graph"),
+      (1, 0, "control witness edge does not exist"),
+    ] {
+    let error = try {
+      ignore(control_dependence_witnesses_at(graph, controller, successor))
+      ""
+    } catch {
+      Invalid(message) => message
+    }
+    assert_eq(error, expected)
   }
 }
 
@@ -304,6 +344,14 @@ test "witness overflow returns a deterministic bounded prefix and SDK rejects it
   }
   assert_eq(analysis.control_dependencies[127], [])
   assert_false(witnesses.any(witness => witness.controller == 48))
+  assert_eq(
+    witness_triples(control_dependence_witnesses_at(graph, 48, 49)),
+    Array::makei(78, index => (48, 49, 49 + index)),
+  )
+  assert_eq(
+    witness_triples(control_dependence_witnesses_at(graph, 28, 88)),
+    Array::makei(39, index => (28, 88, 88 + index)),
+  )
 }
 
 ///|

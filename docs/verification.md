@@ -364,6 +364,29 @@ paths. This excludes process startup, input parsing, and file I/O. Both
 versions produced identical DOT bytes. The local release suite also passed
 92 tests per backend, all SDK examples, and 441 real CLI invocations.
 
+In 0.8.11 the selected-edge SDK and `control-witness` CLI return all witnesses
+for one original directed edge from the finite-exit postdominator tree. They
+share the dependent walk and ordering with the aggregate report. An independent
+finite-path oracle exercises 8,748 selected original edges across 2,187 small
+graph configurations. The aggregate still accepts exactly 65,536 witnesses.
+In the overflowing fixture the edge `n28 → n88` returns 39 dependents, including
+those missing from the bounded prefix, and `n48 → n49` returns all 78 even
+though its entire edge is missing from the prefix. The CLI regression also
+checks the selected answer on a graph whose full JSON exceeds 16 MiB and
+verifies that its output refuses to replace an existing file.
+With moonc 0.10.20+65efd5b93 and Node 22.16.0, local verification passed
+93 tests per backend, all SDK examples, and 443 real CLI invocations.
+The Windows host could not create symlinks and lacks POSIX FIFOs.
+An external CLI comparison matched 113 full reports against the independent
+oracle and 0.8.10 byte for byte, plus both dense witness-limit fixtures.
+It also matched 104 selected edges against the oracle and checked selector
+diagnostics, hyphen-prefixed IDs, and new-file publication.
+
+The same review reproduced an oversized summary using 512 distinct 64-byte IDs
+and 1,022 edges. Its output is rejected only after JSON generation on 0.8.10.
+Validation paths also create graph snapshots whose copies can be discarded
+by read-only callers. Both are separate optimization candidates.
+
 Next useful work follows correctness evidence and real consumers. Candidate
 directions include safe stage ownership/cleanup and explicit data-dependence inputs for program
 slicing. General source-language/IR parsing,
