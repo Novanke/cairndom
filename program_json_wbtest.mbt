@@ -26,6 +26,7 @@ test "program JSON round trips canonically without sharing mutable input rows" {
   let program = parse_program(program_test_source())
   let serialized = program_json_text(program)
   let restored = parse_program(serialized)
+  let plan = plan_ssa(program)
   assert_eq(restored.variables, ["z", "a"])
   assert_eq(restored.graph.nodes, program.graph.nodes)
   assert_eq(restored.graph.edges, program.graph.edges)
@@ -55,6 +56,7 @@ test "program JSON round trips canonically without sharing mutable input rows" {
   assert_eq(restored.variables, ["z", "a"])
   assert_eq(restored.definitions, [[1], [], []])
   assert_eq(restored.uses, [[], [0, 1], []])
+  assert_eq(program_json_text(plan.program), serialized)
 }
 
 ///|
@@ -134,6 +136,45 @@ test "program JSON rejects unknown duplicate missing and mistyped schema facts" 
       Invalid(_) => true
     }
     assert_true(rejected)
+  }
+}
+
+///|
+test "program JSON preserves nested graph and fact diagnostic precedence" {
+  let good =
+    #|{"schema":"cairndom.program.v1","graph":{"schema":"cairndom.graph.v1","nodes":["entry","exit"],"entry":"entry","exits":["exit"],"edges":[["entry","exit"]]},"variables":["x"],"blocks":[]}
+  let extra_graph_field = "\"nodes\":[\"entry\",\"exit\"],\"extra\":"
+  for
+    (invalid, detail) in [
+      (
+        good.replace(
+          old="\"nodes\":[\"entry\",\"exit\"]",
+          new=extra_graph_field + "[[[[[[[0]]]]]]]",
+        ),
+        "unknown field: extra",
+      ),
+      (
+        good.replace(
+          old="\"nodes\":[\"entry\",\"exit\"]",
+          new=extra_graph_field + "[[[[[[[[0]]]]]]]]",
+        ),
+        "invalid JSON, repeated key or excessive nesting",
+      ),
+      (
+        good.replace(
+          old="\"blocks\":[]",
+          new="\"blocks\":[{\"node\":\"entry\",\"defines\":[\"x\",\"x\"],\"uses\":[]},{\"node\":\"exit\",\"defines\":[],\"uses\":[\"absent\"]}]",
+        ),
+        "unknown variable: absent",
+      ),
+    ] {
+    let error = try {
+      ignore(parse_program(invalid))
+      ""
+    } catch {
+      Invalid(message) => message
+    }
+    assert_eq(error, detail)
   }
 }
 

@@ -59,17 +59,18 @@
   edge through the SDK or CLI, including edges omitted by the aggregate limit.
 - Export the JSON summary with an inclusive byte budget, checking each
   serialized record and keeping the saved analysis available after failure.
+- Validate graph and program input separately from copying it. Reuse the
+  decoded graph and its name index in valid program and query files, and
+  retain independent arrays for saved analyses and inspection copies.
 
 ## Next candidates
 
 Prioritize observed correctness problems and reproducible consumers.
 
-1. **Graph validation and ownership.** Measure the extra copying on parse and
-   validation paths before separating synchronous checks from owned snapshots.
-2. **Stage ownership.** Evaluate an ownership and activity protocol before
+1. **Stage ownership.** Evaluate an ownership and activity protocol before
    considering cleanup. Existing stage observations describe the filesystem
    at scan time in a trusted local directory.
-3. **Program slicing.** Define explicit data-dependence inputs before exposing
+2. **Program slicing.** Define explicit data-dependence inputs before exposing
    a slicing API. Document which relationships clients must supply.
 
 The existing mutable Analysis API requires valid, unmodified results to

@@ -113,7 +113,7 @@ fn loop_boundaries_of(
 /// Only entry reachability, immediate dominators and loop membership are
 /// needed. Raise GraphError if the combined lists exceed 65,536 edge pairs.
 pub fn loop_boundaries(graph : Graph) -> Array[LoopBoundary] raise GraphError {
-  let graph = snapshot_graph(graph)
+  validate_graph(graph)
   let (succ, pred) = adjacency(graph)
   let forward = compute_dominator_tree(succ, pred, graph.entry)
   let loops = natural_loops(graph, pred, forward, nest=false)
@@ -129,7 +129,7 @@ pub fn loop_boundary_at(
   graph : Graph,
   header : Int32,
 ) -> LoopBoundary? raise GraphError {
-  let graph = snapshot_graph(graph)
+  validate_graph(graph)
   if header < 0 || header >= graph.nodes.length() {
     raise Invalid("loop header index is outside the graph")
   }

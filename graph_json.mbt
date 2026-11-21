@@ -1,5 +1,5 @@
 ///|
-// Requires a graph already checked by snapshot_graph.
+// Requires a validated graph.
 fn graph_json_value(graph : Graph) -> Json {
   Json::object(
     Map([
@@ -27,5 +27,6 @@ fn graph_json_value(graph : Graph) -> Json {
 /// Serialize a validated graph to cairndom.graph.v1. Node, edge and exit order
 /// is preserved so SDK-built/edited graphs can be saved and consumed by the CLI.
 pub fn graph_json_text(graph : Graph) -> String raise GraphError {
-  graph_json_value(snapshot_graph(graph)).stringify(indent=2)
+  validate_graph(graph)
+  graph_json_value(graph).stringify(indent=2)
 }

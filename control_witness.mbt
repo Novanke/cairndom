@@ -109,7 +109,7 @@ fn witness_post_tree(graph : Graph) -> DominatorTree? {
 pub fn control_dependence_witnesses(
   graph : Graph,
 ) -> Array[ControlWitness] raise GraphError {
-  let graph = snapshot_graph(graph)
+  validate_graph(graph)
   guard witness_post_tree(graph) is Some(post) else { return [] }
   let (witnesses, complete) = bounded_control_witnesses(graph, post)
   if !complete {
@@ -128,7 +128,7 @@ pub fn control_dependence_witnesses_at(
   controller : Int32,
   successor : Int32,
 ) -> Array[ControlWitness] raise GraphError {
-  let graph = snapshot_graph(graph)
+  validate_graph(graph)
   let n = graph.nodes.length()
   if controller < 0 || controller >= n {
     raise Invalid("control witness controller index is outside the graph")

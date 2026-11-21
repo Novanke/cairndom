@@ -149,7 +149,12 @@ fn compute_dominance(
 /// Compute entry-rooted immediate dominators and dominance frontiers. Only paths
 /// reachable from entry participate; unreachable predecessors are ignored.
 pub fn dominators(graph : Graph) -> Dominance raise GraphError {
-  let snapshot = snapshot_graph(graph)
-  let (succ, pred) = adjacency(snapshot)
-  compute_dominance(succ, pred, snapshot.entry)
+  validate_graph(graph)
+  dominators_checked(graph)
+}
+
+///|
+fn dominators_checked(graph : Graph) -> Dominance {
+  let (succ, pred) = adjacency(graph)
+  compute_dominance(succ, pred, graph.entry)
 }

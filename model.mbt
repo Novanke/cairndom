@@ -92,23 +92,30 @@ fn valid_id(id : String) -> Bool {
 }
 
 ///|
-fn snapshot_graph(input : Graph) -> Graph raise GraphError {
-  let n = input.nodes.length()
-  if n < 1 || n > max_nodes || input.edges.length() > max_edges {
+fn validate_graph(graph : Graph) -> Unit raise GraphError {
+  let n = graph.nodes.length()
+  if n < 1 || n > max_nodes || graph.edges.length() > max_edges {
     raise Invalid("graph limits are 1..512 nodes and at most 8192 edges")
   }
-  if input.entry < 0 || input.entry >= n {
+  if graph.entry < 0 || graph.entry >= n {
     raise Invalid("entry index is outside the graph")
   }
   let names : Map[String, Bool] = Map([])
-  for name in input.nodes {
+  for name in graph.nodes {
     if !valid_id(name) || names.contains(name) {
       raise Invalid("invalid or duplicate node ID: " + name)
     }
     names[name] = true
   }
+  validate_graph_connections(graph)
+}
+
+///|
+// The caller has already checked node IDs, limits and the entry reference.
+fn validate_graph_connections(graph : Graph) -> Unit raise GraphError {
+  let n = graph.nodes.length()
   let pairs : Map[(Int32, Int32), Bool] = Map([])
-  for (from, to) in input.edges {
+  for (from, to) in graph.edges {
     if from < 0 || from >= n || to < 0 || to >= n {
       raise Invalid("edge index is outside the graph")
     }
@@ -118,17 +125,21 @@ fn snapshot_graph(input : Graph) -> Graph raise GraphError {
     pairs[(from, to)] = true
   }
   let exits : Map[Int32, Bool] = Map([])
-  for exit in input.exits {
+  for exit in graph.exits {
     if exit < 0 || exit >= n || exits.contains(exit) {
       raise Invalid("invalid or duplicate exit")
     }
     exits[exit] = true
   }
-  for (from, _) in input.edges {
+  for (from, _) in graph.edges {
     if exits.contains(from) {
       raise Invalid("declared exits must have no outgoing edges")
     }
   }
+}
+
+///|
+fn copy_graph(input : Graph) -> Graph {
   {
     nodes: input.nodes.copy(),
     edges: input.edges.copy(),

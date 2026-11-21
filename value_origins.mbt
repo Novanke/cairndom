@@ -178,12 +178,7 @@ fn trace_use_checked(
 /// space and O(n + e) work, without a block/variable/source state matrix.
 pub fn trace_values(input : FlowProgram) -> ValueOrigins raise GraphError {
   validate_program(input)
-  let program : FlowProgram = {
-    graph: snapshot_graph(input.graph),
-    variables: input.variables.copy(),
-    definitions: input.definitions.map(row => row.copy()),
-    uses: input.uses.map(row => row.copy()),
-  }
+  let program = copy_program(input)
   let search = value_origin_graph(program.graph)
   let use_sites : Array[Array[Int32]] = Array::makei(
     program.variables.length(),
@@ -228,19 +223,7 @@ pub fn trace_values(input : FlowProgram) -> ValueOrigins raise GraphError {
 /// Return an independently mutable input snapshot, including all graph arrays
 /// and nested definition/use rows. Editing it cannot change these origins.
 pub fn ValueOrigins::program(self : Self) -> FlowProgram {
-  let program = self.program
-  let graph = program.graph
-  {
-    graph: {
-      nodes: graph.nodes.copy(),
-      edges: graph.edges.copy(),
-      entry: graph.entry,
-      exits: graph.exits.copy(),
-    },
-    variables: program.variables.copy(),
-    definitions: program.definitions.map(row => row.copy()),
-    uses: program.uses.map(row => row.copy()),
-  }
+  copy_program(self.program)
 }
 
 ///|

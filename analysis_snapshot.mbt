@@ -27,14 +27,8 @@ fn analysis_snapshot_tree(tree : Dominance) -> Dominance {
 /// component and control array. Edits affect neither later reads nor exports.
 pub fn AnalysisSnapshot::analysis(self : Self) -> Analysis {
   let source = self.stored
-  let graph = source.graph
   {
-    graph: {
-      nodes: graph.nodes.copy(),
-      edges: graph.edges.copy(),
-      entry: graph.entry,
-      exits: graph.exits.copy(),
-    },
+    graph: copy_graph(source.graph),
     forward: analysis_snapshot_tree(source.forward),
     post: analysis_snapshot_tree(source.post),
     loops: source.loops.map(loop_info => {

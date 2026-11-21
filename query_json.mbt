@@ -92,11 +92,7 @@ pub fn query_json_text(input : String) -> String raise GraphError {
   if tree_kind != "forward" && tree_kind != "post" {
     raise Invalid("query tree must be forward or post")
   }
-  let graph = parse_graph(required(object, "graph").stringify())
-  let names : Map[String, Int32] = Map([])
-  for node, name in graph.nodes {
-    names[name] = node
-  }
+  let (graph, names) = decode_nested_graph(required(object, "graph"))
   let queries : Array[BatchQuery] = []
   let mut operands = 0
   for value in items(required(object, "queries"), max_batch_queries) {

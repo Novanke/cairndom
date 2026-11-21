@@ -18,20 +18,8 @@ pub fn prepare_ssa(program : FlowProgram) -> SsaSnapshot raise GraphError {
 /// Editing this value neither changes later reads nor the exported report.
 pub fn SsaSnapshot::plan(self : Self) -> SsaPlan {
   let plan = self.stored
-  let program = plan.program
-  let graph = program.graph
   {
-    program: {
-      graph: {
-        nodes: graph.nodes.copy(),
-        edges: graph.edges.copy(),
-        entry: graph.entry,
-        exits: graph.exits.copy(),
-      },
-      variables: program.variables.copy(),
-      definitions: program.definitions.map(row => row.copy()),
-      uses: program.uses.map(row => row.copy()),
-    },
+    program: copy_program(plan.program),
     liveness: {
       reachable: plan.liveness.reachable.copy(),
       live_in: plan.liveness.live_in.map(row => row.copy()),

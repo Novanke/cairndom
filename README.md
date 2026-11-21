@@ -77,6 +77,8 @@ Windows 的 Node.js CLI 会在创建暂存前拒绝该模式。其他平台须�
 
 SDK 构建或编辑图后，可用 `graph_json_text(graph)` 生成同一 `cairndom.graph.v1` 格式，再交给 `parse_graph` 或文件 CLI。导出前会校验图，保留节点、边和出口的输入顺序；分析报告本身是另一种格式，不应当作原图重新导入。
 
+图解析会直接返回本次构造的数组，程序和批量查询也复用内嵌图的解析结果。公开接口仍会检查调用方传入的可变图。同步只读查询直接读取已校验的输入；分析、SSA 和全量值来源结果会独立保存需要持有的图与事实数组。
+
 支配关系仅覆盖入口可达子图。入口自身的直接支配节点为空，不可达节点也为空，应同时检查 `reachable`。
 
 后支配使用虚拟出口，**仅针对入口可达且最终到达声明出口的有限路径**。报告以 `can_reach_exit` 和 `postdominator_is_virtual_exit` 区分无出口路径与虚拟父节点。这种分析不会证明所有执行都终止，分支进入永久循环时尤其需要保留该范围解释。控制依赖采用同一有限出口路径范围。
@@ -108,7 +110,7 @@ node _build/js/release/build/cmd/main/main.js loop-boundary examples/branch-loop
 ## SDK
 
 ```sh
-moon add Novanke/cairndom@0.8.12
+moon add Novanke/cairndom@0.8.13
 ```
 
 在调用方 `moon.pkg` 中导入 `"Novanke/cairndom" @dom`。可直接构建 `Graph`，或调用 `parse_graph`。核心入口为 `analyze`，也可单独调用 `dominators` 或 `postdominators`。图边使用节点数组索引。只需要自然循环边界或控制依赖证据时，可以直接调用相应查询，结果沿用完整分析的图校验和排序规则。

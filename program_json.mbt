@@ -34,7 +34,7 @@ pub fn parse_program(input : String) -> FlowProgram raise GraphError {
   if text(required(object, "schema")) != "cairndom.program.v1" {
     raise Invalid("schema must be cairndom.program.v1")
   }
-  let graph = parse_graph(required(object, "graph").stringify())
+  let (graph, node_names) = decode_nested_graph(required(object, "graph"))
   let variables = []
   let variable_names : Map[String, Int32] = Map([])
   for value in items(required(object, "variables"), max_variables) {
@@ -44,10 +44,6 @@ pub fn parse_program(input : String) -> FlowProgram raise GraphError {
     }
     variable_names[name] = variables.length()
     variables.push(name)
-  }
-  let node_names : Map[String, Int32] = Map([])
-  for node, name in graph.nodes {
-    node_names[name] = node
   }
   let n = graph.nodes.length()
   let definitions : Array[Array[Int32]] = Array::makei(n, _ => [])
@@ -77,7 +73,7 @@ pub fn parse_program(input : String) -> FlowProgram raise GraphError {
     uses[node] = used
   }
   let program = { graph, variables, definitions, uses, }
-  validate_program(program)
+  validate_program_rows(program)
   program
 }
 

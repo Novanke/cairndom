@@ -54,6 +54,14 @@ fn node_index(
 ///|
 /// Parse cairndom.graph.v1 with string node IDs and strict JSON keys.
 pub fn parse_graph(input : String) -> Graph raise GraphError {
+  let (graph, _) = parse_graph_with_names(input)
+  graph
+}
+
+///|
+fn parse_graph_with_names(
+  input : String,
+) -> (Graph, Map[String, Int32]) raise GraphError {
   if input.length() > 2_097_152 {
     raise Invalid("graph JSON exceeds 2 MiB")
   }
@@ -64,6 +72,11 @@ pub fn parse_graph(input : String) -> Graph raise GraphError {
   ) catch {
     _ => raise Invalid("invalid JSON, repeated key or excessive nesting")
   }
+  decode_graph(value)
+}
+
+///|
+fn decode_graph(value : Json) -> (Graph, Map[String, Int32]) raise GraphError {
   let object = fields(value, ["schema", "nodes", "edges", "entry", "exits"])
   if text(required(object, "schema")) != "cairndom.graph.v1" {
     raise Invalid("schema must be cairndom.graph.v1")
@@ -90,12 +103,27 @@ pub fn parse_graph(input : String) -> Graph raise GraphError {
   for value in items(required(object, "exits"), max_nodes) {
     exits.push(node_index(names, value))
   }
-  snapshot_graph({
+  let graph : Graph = {
     nodes,
     edges,
     exits,
     entry: node_index(names, required(object, "entry")),
-  })
+  }
+  validate_graph_connections(graph)
+  (graph, names)
+}
+
+///|
+fn decode_nested_graph(
+  value : Json,
+) -> (Graph, Map[String, Int32]) raise GraphError {
+  // The outer parser already rejected recursive duplicate keys. A successfully
+  // decoded graph has bounded arrays of validated ASCII IDs and cannot exceed
+  // the legacy compact-text size or depth limits. Preserve their precedence
+  // over schema errors on malformed input by using the old wire path there.
+  decode_graph(value) catch {
+    Invalid(_) => parse_graph_with_names(value.stringify())
+  }
 }
 
 ///|
@@ -257,9 +285,9 @@ pub fn analysis_dot(result : Analysis) -> String {
 /// Validate a graph and export DOT with entry reachability and immediate
 /// dominators. Output matches analysis_dot(analyze(graph)).
 pub fn graph_dot(input : Graph) -> String raise GraphError {
-  let graph = snapshot_graph(input)
-  let (succ, pred) = adjacency(graph)
-  render_dominance_dot(graph, compute_dominator_tree(succ, pred, graph.entry))
+  validate_graph(input)
+  let (succ, pred) = adjacency(input)
+  render_dominance_dot(input, compute_dominator_tree(succ, pred, input.entry))
 }
 
 ///|

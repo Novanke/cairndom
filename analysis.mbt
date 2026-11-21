@@ -2,7 +2,8 @@
 /// Analyze the entry-reachable graph. Postdominance and control dependence are
 /// conditioned on finite paths reaching the explicitly declared terminal exits.
 pub fn analyze(input : Graph) -> Analysis raise GraphError {
-  let graph = snapshot_graph(input)
+  validate_graph(input)
+  let graph = copy_graph(input)
   let n = graph.nodes.length()
   let (succ, pred) = adjacency(graph)
   let forward = compute_dominance(succ, pred, graph.entry)

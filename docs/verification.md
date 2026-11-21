@@ -415,6 +415,57 @@ summary fell from 124.96 to 113.62 MiB. Peaks cover file input, analysis,
 serialization, and any output. Exit status, stdout, and stderr matched in
 every pair. These are process-level measurements for the two fixtures.
 
+In 0.8.13 graph validation checks input without taking ownership of its
+arrays. Read-only graph queries and exports validate the mutable public input
+at their boundary. Analysis, SSA planning and value-origin results make
+separate copies when they retain source data, and snapshot inspections still
+return independently mutable data. SSA solves liveness and dominance on its
+already validated copy. Sorts keep their local copies of edge order.
+
+The wire decoder creates its own graph and name index. Program and query
+parsers consume the already decoded nested JSON value and reuse the same
+index. A valid graph is shallow and fits the standalone compact-text limit
+at the maximum supported sizes. Malformed nested graphs use the original
+compact-text validation path to retain size, depth, and error precedence.
+Regression tests exercise competing decode and structural errors, nested
+graph depth, and independence after source mutation.
+
+An external comparison with 0.8.12 matched the exact output bytes and the
+independent reference for 113 graph JSON reports, 113 DOT graphs, 40 SSA
+reports, 10 named query batches and 43 value-origin reports. All 44 malformed
+diagnostics matched the old bytes, including competing errors and nested
+depth limits. The dense fixture also passed new-file and overwrite-refusal
+checks. Local verification ran 97 tests per backend, all SDK examples and
+443 real CLI invocations. The Windows host skipped symlink creation and
+POSIX FIFO replacement checks due to platform capability.
+
+The benchmark uses 512 nodes named `n000` through `n511`, padded on the right
+with `a` to 64 ASCII bytes. Add edges from lower to higher indices in
+increasing gap order, then ascending source order, stopping at 8,192 edges.
+Node 0 is the entry and node 511 is the exit. The graph file is 1,148,618
+bytes. The postdominator batch includes 16 dominance checks and 16 pairwise
+common-ancestor queries. The SSA fixture defines one variable at nodes 0 and
+1 and uses it at node 511.
+
+Windows and Node.js 22.16.0 ran nine alternating fresh process pairs against
+the optimized JavaScript of each version. The table gives median wall time
+and median `GetProcessMemoryInfo` peak working set for the complete CLI
+process, including startup, file input and report output.
+
+| Workflow | Wall time 0.8.12 to 0.8.13 | Peak working set 0.8.12 to 0.8.13 |
+| --- | ---: | ---: |
+| Named postdominator batch | 204.22 to 190.70 ms | 58.32 to 50.59 MiB |
+| SSA planning | 251.08 to 220.47 ms | 66.22 to 57.19 MiB |
+| Single-edge witness | 188.70 to 182.29 ms | 50.99 to 50.66 MiB |
+
+Separate SDK timing ran six warmups and 20 measured calls per process, using
+the same nine-pair procedure. Its timed loop covers the selected operation,
+with startup, file input and digest computation outside the timing. Mean
+time per call, reported as the median across processes, was 7.703 to 7.337 ms
+for `parse_graph` and 1.759 to 1.783 ms for a typed witness query, which
+continues to validate each input. Process peaks were 79.41 to 79.49 MiB
+and 60.82 to 59.62 MiB respectively. All timed results matched.
+
 Next useful work follows correctness evidence and real consumers. Candidate
 directions include safe stage ownership/cleanup and explicit data-dependence inputs for program
 slicing. General source-language/IR parsing,

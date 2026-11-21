@@ -61,7 +61,7 @@ fn entry_reachability(graph : Graph) -> Array[Bool] {
 /// The root is the virtual exit at graph.nodes.length(), and all arrays have
 /// one extra slot for it. With no reachable declared exit only that root is
 /// reachable. Returned arrays are independently owned.
-pub fn postdominators(input : Graph) -> Dominance raise GraphError {
-  let graph = snapshot_graph(input)
+pub fn postdominators(graph : Graph) -> Dominance raise GraphError {
+  validate_graph(graph)
   compute_postdominance(graph, entry_reachability(graph))
 }

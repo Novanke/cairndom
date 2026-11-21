@@ -25,14 +25,9 @@ pub(all) struct SsaPlan {
 /// This does not infer statement ordering, rename variables or rewrite an IR.
 pub fn plan_ssa(input : FlowProgram) -> SsaPlan raise GraphError {
   validate_program(input)
-  let program : FlowProgram = {
-    graph: snapshot_graph(input.graph),
-    variables: input.variables.copy(),
-    definitions: input.definitions.map(row => row.copy()),
-    uses: input.uses.map(row => row.copy()),
-  }
-  let live = liveness(program)
-  let tree = dominators(program.graph)
+  let program = copy_program(input)
+  let live = liveness_checked(program)
+  let tree = dominators_checked(program.graph)
   let placements : Array[PhiPlacement] = []
   for variable in 0..<program.variables.length() {
     let definitions = []

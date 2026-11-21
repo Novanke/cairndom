@@ -29,7 +29,7 @@ let max_program_associations : Int32 = 16384
 /// Validate the graph before checking the block facts. Every block has exactly
 /// one definitions row and one uses row, including unreachable blocks.
 fn validate_program(program : FlowProgram) -> Unit raise GraphError {
-  ignore(snapshot_graph(program.graph))
+  validate_graph(program.graph)
   let variable_count = program.variables.length()
   if variable_count > max_variables {
     raise Invalid("program limit is at most 512 variables")
@@ -41,6 +41,13 @@ fn validate_program(program : FlowProgram) -> Unit raise GraphError {
     }
     names[name] = true
   }
+  validate_program_rows(program)
+}
+
+///|
+// The graph and variable IDs have already been validated.
+fn validate_program_rows(program : FlowProgram) -> Unit raise GraphError {
+  let variable_count = program.variables.length()
   let node_count = program.graph.nodes.length()
   if program.definitions.length() != node_count ||
     program.uses.length() != node_count {
@@ -72,6 +79,16 @@ fn validate_program(program : FlowProgram) -> Unit raise GraphError {
 }
 
 ///|
+fn copy_program(program : FlowProgram) -> FlowProgram {
+  {
+    graph: copy_graph(program.graph),
+    variables: program.variables.copy(),
+    definitions: program.definitions.map(row => row.copy()),
+    uses: program.uses.map(row => row.copy()),
+  }
+}
+
+///|
 /// Compute the least fixed point live_out[b] = union live_in[successor] and
 /// live_in[b] = uses[b] union (live_out[b] minus definitions[b]). Only reachable
 /// successors participate; declared exits do not restrict this analysis.
@@ -79,6 +96,11 @@ fn validate_program(program : FlowProgram) -> Unit raise GraphError {
 /// propagation per reachable block and variable, and never recurses.
 pub fn liveness(program : FlowProgram) -> Liveness raise GraphError {
   validate_program(program)
+  liveness_checked(program)
+}
+
+///|
+fn liveness_checked(program : FlowProgram) -> Liveness {
   let graph = program.graph
   let n = graph.nodes.length()
   let m = program.variables.length()
