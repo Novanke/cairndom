@@ -106,34 +106,45 @@ fn BoundedJsonWriter::witness_rows(
 fn bounded_analysis_json_text(
   result : Analysis,
   limit : Int32,
+  include_witnesses~ : Bool,
 ) -> String raise GraphError {
+  let (schema, overflow_detail) = if include_witnesses {
+    ("cairndom.analysis.v1", "analysis JSON exceeds the byte limit")
+  } else {
+    (
+      "cairndom.analysis-summary.v1", "analysis summary JSON exceeds the byte limit",
+    )
+  }
   let out : BoundedJsonWriter = {
     buffer: StringBuilder(),
     remaining: limit,
-    overflow_detail: "analysis JSON exceeds the byte limit",
+    overflow_detail,
   }
   out.append("{\n")
-  for (name, value) in analysis_report_fields(result, "cairndom.analysis.v1") {
+  for index, (name, value) in analysis_report_fields(result, schema) {
+    if index > 0 {
+      out.append(",\n")
+    }
     out.field(name)
     out.value(value, "  ")
-    out.append(",\n")
   }
   for (name, count, row) in analysis_report_sections(result) {
-    out.rows(name, count, row)
     out.append(",\n")
+    out.rows(name, count, row)
   }
-  // Only the bounded list of integer triples is needed to know the flag before
-  // the array, as required by the existing byte order. Format one witness row
-  // at a time and stop the serialization as soon as a fragment won't fit.
-  let (witnesses, complete) = bounded_control_witnesses_of(result)
-  out.field("control_witnesses_complete")
-  out.append(if complete { "true" } else { "false" })
-  out.append(",\n")
-  out.field("control_witness_limit")
-  let witness_limit = max_control_witnesses.to_string()
-  out.append(witness_limit[:])
-  out.append(",\n")
-  out.witness_rows(result.graph, witnesses)
+  if include_witnesses {
+    // The sorted prefix determines the completeness flag before the rows.
+    let (witnesses, complete) = bounded_control_witnesses_of(result)
+    out.append(",\n")
+    out.field("control_witnesses_complete")
+    out.append(if complete { "true" } else { "false" })
+    out.append(",\n")
+    out.field("control_witness_limit")
+    let witness_limit = max_control_witnesses.to_string()
+    out.append(witness_limit[:])
+    out.append(",\n")
+    out.witness_rows(result.graph, witnesses)
+  }
   out.append("\n}")
   out.buffer.to_string()
 }

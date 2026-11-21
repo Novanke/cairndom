@@ -89,6 +89,8 @@ SDK 构建或编辑图后，可用 `graph_json_text(graph)` 生成同一 `cairnd
 
 如果只需要节点级分析，使用 `analyze --format json-summary` 或快照的 `summary_json_text()`。摘要使用独立格式 `cairndom.analysis-summary.v1`，保留可达性、支配关系、控制依赖、自然循环和强连通分量，跳过边级证据的计算与输出。密集图的完整报告若因边级证据过大而无法导出，摘要仍可能适用。两种 JSON 输出都受各自入口的 16 MiB 上限约束。
 
+摘要按记录生成，在追加每段文本前核对剩余字节。SDK 可用 `saved.summary_json_text_limit(bytes)` 将正文预算设为 0 到 16 MiB，刚好达到预算时仍可导出。CLI 把末尾换行计入 16 MiB，仅在整份报告符合预算后才写入标准输出或新文件。
+
 自然循环由“循环头支配回边来源”定义，同一头的回边合并。多入口 SCC 会单独标记，它们可能没有自然循环头。SCC 的 `multiple_entries` 只描述该分量的入口数，完整的嵌套不可约性分类仍属后续工作。
 
 SDK 的 `loop_boundaries(graph)` 为每个自然循环列出进入边、离开边和返回循环头的回边，按端点索引排序，排除不可达前驱。嵌套循环分别计算边界；包含图入口的循环不会凭空添加进入边。没有离开边仅表示图结构，不构成终止性证明。展开总量限制为 65,536 个边记录，超限会报错，避免返回不完整边界。独立查询只计算入口可达性、直接支配关系和自然循环成员及回边。
@@ -106,7 +108,7 @@ node _build/js/release/build/cmd/main/main.js loop-boundary examples/branch-loop
 ## SDK
 
 ```sh
-moon add Novanke/cairndom@0.8.11
+moon add Novanke/cairndom@0.8.12
 ```
 
 在调用方 `moon.pkg` 中导入 `"Novanke/cairndom" @dom`。可直接构建 `Graph`，或调用 `parse_graph`。核心入口为 `analyze`，也可单独调用 `dominators` 或 `postdominators`。图边使用节点数组索引。只需要自然循环边界或控制依赖证据时，可以直接调用相应查询，结果沿用完整分析的图校验和排序规则。

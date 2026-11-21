@@ -72,7 +72,7 @@ pub fn AnalysisSnapshot::json_text_limit(
   if limit < 0 || limit > max_report_json_bytes {
     raise Invalid("analysis JSON byte limit must be between 0 and 16 MiB")
   }
-  bounded_analysis_json_text(self.stored, limit)
+  bounded_analysis_json_text(self.stored, limit, include_witnesses=true)
 }
 
 ///|
@@ -82,11 +82,24 @@ pub fn AnalysisSnapshot::json_text_limit(
 pub fn AnalysisSnapshot::summary_json_text(
   self : Self,
 ) -> String raise GraphError {
-  let text = analysis_report_value(self.stored, false).stringify(indent=2)
-  if text.length() > 16_777_216 {
-    raise Invalid("analysis summary JSON exceeds 16 MiB")
+  self.summary_json_text_limit(max_report_json_bytes) catch {
+    Invalid(_) => raise Invalid("analysis summary JSON exceeds 16 MiB")
   }
-  text
+}
+
+///|
+/// Export the same summary with an inclusive UTF-8 byte budget between zero
+/// and 16 MiB. The budget covers the body, before any caller-added newline.
+pub fn AnalysisSnapshot::summary_json_text_limit(
+  self : Self,
+  limit : Int32,
+) -> String raise GraphError {
+  if limit < 0 || limit > max_report_json_bytes {
+    raise Invalid(
+      "analysis summary JSON byte limit must be between 0 and 16 MiB",
+    )
+  }
+  bounded_analysis_json_text(self.stored, limit, include_witnesses=false)
 }
 
 ///|

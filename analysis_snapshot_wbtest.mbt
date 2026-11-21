@@ -282,6 +282,76 @@ test "full analysis JSON accepts an exact byte budget and rejects invalid or sma
 }
 
 ///|
+test "summary JSON preserves legacy bytes and enforces an inclusive budget" {
+  let loops = analysis_snapshot_test_graph()
+  let empty_sections : Graph = {
+    nodes: ["entry"],
+    edges: [],
+    entry: 0,
+    exits: [],
+  }
+  for graph in [loops, empty_sections] {
+    let saved = prepare_analysis(graph)
+    let inspected = saved.analysis()
+    let fields = match @json.parse(analysis_json_text(inspected)) {
+      Object(object) => object
+      _ => fail("expected an analysis report object")
+    }
+    fields["schema"] = Json::string("cairndom.analysis-summary.v1")
+    fields.remove("control_witnesses")
+    fields.remove("control_witnesses_complete")
+    fields.remove("control_witness_limit")
+    let expected = Json::object(fields).stringify(indent=2)
+    assert_eq(saved.summary_json_text_limit(expected.length()), expected)
+    for
+      (limit, detail) in [
+        (expected.length() - 1, "analysis summary JSON exceeds the byte limit"),
+        (0, "analysis summary JSON exceeds the byte limit"),
+        (-1, "analysis summary JSON byte limit must be between 0 and 16 MiB"),
+        (
+          16_777_217, "analysis summary JSON byte limit must be between 0 and 16 MiB",
+        ),
+      ] {
+      let error = try {
+        ignore(saved.summary_json_text_limit(limit))
+        ""
+      } catch {
+        Invalid(message) => message
+      }
+      assert_eq(error, detail)
+    }
+    assert_eq(saved.summary_json_text(), expected)
+    analysis_snapshot_test_equal(saved.analysis(), inspected)
+  }
+}
+
+///|
+test "oversized summary keeps the saved analysis inspectable and DOT exportable" {
+  let prefix = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456"
+  let edges = Array::makei(511, node => (node, node + 1))
+  for header in 0..<511 {
+    edges.push((510, header))
+  }
+  let saved = prepare_analysis({
+    nodes: Array::makei(512, node => prefix + (10000 + node).to_string()),
+    edges,
+    entry: 0,
+    exits: [511],
+  })
+  let error = try {
+    ignore(saved.summary_json_text())
+    ""
+  } catch {
+    Invalid(message) => message
+  }
+  assert_eq(error, "analysis summary JSON exceeds 16 MiB")
+  let inspected = saved.analysis()
+  assert_eq(inspected.loops.length(), 511)
+  assert_eq(inspected.graph.edges.length(), 1022)
+  assert_eq(saved.dot_text(), analysis_dot(inspected))
+}
+
+///|
 test "oversized saved analysis remains inspectable and DOT exportable while JSON fails completely" {
   let short_names = witness_overflow_graph()
   let short_saved = prepare_analysis(short_names)

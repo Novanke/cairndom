@@ -223,26 +223,19 @@ fn analysis_witness_value(graph : Graph, witness : ControlWitness) -> Json {
 }
 
 ///|
-fn analysis_report_value(result : Analysis, include_witnesses : Bool) -> Json {
-  let schema = if include_witnesses {
-    "cairndom.analysis.v1"
-  } else {
-    "cairndom.analysis-summary.v1"
-  }
-  let report = Map(analysis_report_fields(result, schema))
+fn analysis_report_value(result : Analysis) -> Json {
+  let report = Map(analysis_report_fields(result, "cairndom.analysis.v1"))
   for (name, count, row) in analysis_report_sections(result) {
     report[name] = Json::array(Array::makei(count, row))
   }
-  if include_witnesses {
-    let (witnesses, complete) = bounded_control_witnesses_of(result)
-    report["control_witnesses_complete"] = Json::boolean(complete)
-    report["control_witness_limit"] = Json::number(
-      max_control_witnesses.to_double(),
-    )
-    report["control_witnesses"] = Json::array(
-      witnesses.map(witness => analysis_witness_value(result.graph, witness)),
-    )
-  }
+  let (witnesses, complete) = bounded_control_witnesses_of(result)
+  report["control_witnesses_complete"] = Json::boolean(complete)
+  report["control_witness_limit"] = Json::number(
+    max_control_witnesses.to_double(),
+  )
+  report["control_witnesses"] = Json::array(
+    witnesses.map(witness => analysis_witness_value(result.graph, witness)),
+  )
   Json::object(report)
 }
 
@@ -250,7 +243,7 @@ fn analysis_report_value(result : Analysis, include_witnesses : Bool) -> Json {
 /// Report indices as original string IDs, with explicit reachability and exit
 /// scope. A virtual postdominator parent is distinguished from no exit path.
 pub fn analysis_json_text(result : Analysis) -> String {
-  analysis_report_value(result, true).stringify(indent=2)
+  analysis_report_value(result).stringify(indent=2)
 }
 
 ///|

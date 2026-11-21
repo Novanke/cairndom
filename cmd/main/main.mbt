@@ -512,18 +512,19 @@ fn execute(args : Array[String]) -> Unit raise {
     @cairn.trace_values(@cairn.parse_program(input)).json_text()
   } else {
     let graph = @cairn.parse_graph(input)
-    if options.format == "json-summary" {
-      let saved = @cairn.prepare_analysis(graph)
-      saved.summary_json_text() catch {
-        @cairn.Invalid(_) =>
-          raise CommandError("limit", "output exceeds 16 MiB")
-      }
-    } else if options.format == "dot" {
+    if options.format == "dot" {
       @cairn.graph_dot(graph)
     } else {
       let saved = @cairn.prepare_analysis(graph)
       // Reserve the final LF inside the existing CLI byte limit.
-      saved.json_text_limit(16_777_215) catch {
+      let body_limit = 16_777_215
+      try {
+        if options.format == "json-summary" {
+          saved.summary_json_text_limit(body_limit)
+        } else {
+          saved.json_text_limit(body_limit)
+        }
+      } catch {
         @cairn.Invalid(_) =>
           raise CommandError("limit", "output exceeds 16 MiB")
       }

@@ -57,20 +57,19 @@
   SDK, with the same output as the full-analysis renderer.
 - Inspect the complete finite-exit control witnesses for one original directed
   edge through the SDK or CLI, including edges omitted by the aggregate limit.
+- Export the JSON summary with an inclusive byte budget, checking each
+  serialized record and keeping the saved analysis available after failure.
 
 ## Next candidates
 
 Prioritize observed correctness problems and reproducible consumers.
 
-1. **Summary export.** Check the JSON budget during serialization. A valid
-   graph with 512 long node IDs and nested natural loops can exceed 16 MiB,
-   and the current summary generates all JSON before rejecting it.
-2. **Graph validation and ownership.** Measure the extra copying on parse and
+1. **Graph validation and ownership.** Measure the extra copying on parse and
    validation paths before separating synchronous checks from owned snapshots.
-3. **Stage ownership.** Evaluate an ownership and activity protocol before
+2. **Stage ownership.** Evaluate an ownership and activity protocol before
    considering cleanup. Existing stage observations describe the filesystem
    at scan time in a trusted local directory.
-4. **Program slicing.** Define explicit data-dependence inputs before exposing
+3. **Program slicing.** Define explicit data-dependence inputs before exposing
    a slicing API. Document which relationships clients must supply.
 
 The existing mutable Analysis API requires valid, unmodified results to

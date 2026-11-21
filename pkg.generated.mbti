@@ -81,6 +81,7 @@ pub fn AnalysisSnapshot::dot_text(Self) -> String
 pub fn AnalysisSnapshot::json_text(Self) -> String raise GraphError
 pub fn AnalysisSnapshot::json_text_limit(Self, Int32) -> String raise GraphError
 pub fn AnalysisSnapshot::summary_json_text(Self) -> String raise GraphError
+pub fn AnalysisSnapshot::summary_json_text_limit(Self, Int32) -> String raise GraphError
 
 pub(all) struct Component {
   members : Array[Int32]

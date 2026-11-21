@@ -382,10 +382,38 @@ oracle and 0.8.10 byte for byte, plus both dense witness-limit fixtures.
 It also matched 104 selected edges against the oracle and checked selector
 diagnostics, hyphen-prefixed IDs, and new-file publication.
 
-The same review reproduced an oversized summary using 512 distinct 64-byte IDs
-and 1,022 edges. Its output is rejected only after JSON generation on 0.8.10.
-Validation paths also create graph snapshots whose copies can be discarded
-by read-only callers. Both are separate optimization candidates.
+In 0.8.12 `summary_json_text` and `summary_json_text_limit` serialize each
+section a record at a time with the same MoonBit writer used by the full
+report. The writer checks the remaining byte budget before appending text.
+The SDK budget covers the body, and the CLI reserves one byte for the trailing
+newline before serialization. An over-budget CLI call emits the existing
+diagnostic and creates no output file or stage.
+
+The comparison with 0.8.11 matched 113 summaries byte for byte and against
+the independent oracle. Actual files exercised bodies of 16 MiB minus one
+byte, exactly 16 MiB, and 16 MiB plus one byte. The first produces exactly
+16 MiB on CLI stdout; the other two reproduce the same CLI limit error.
+New-file and existing-file checks verify publication or refusal without
+staging residue. The SDK tests cover exact budgets and access to the saved
+analysis and DOT after rejection. The local suite passed 95 tests per backend,
+all SDK examples, and 443 real CLI invocations on Node.js 22.16.0 and
+moonc 0.10.20+65efd5b93.
+
+The peak-memory fixtures have 512 nodes and 1,022 edges. A directed chain
+connects nodes 0 through 511, with back edges from node 510 to nodes 0 through
+510 and node 511 as the only declared exit. For exact CLI capacity, identifier
+widths are 47 for node 0, 51 for nodes 1 through 260, 50 for nodes 261 through
+510, and 10 for node 511. Pad distinct ASCII IDs to those widths. Moving one
+character from the ID of node 1 to that of node 0 adds one output byte.
+The oversized fixture uses 64-byte identifiers and would produce a
+20,364,442-byte body using the unbounded summary layout.
+
+On Windows, seven alternating pairs of fresh Node.js 22.16.0 processes
+measured the median of `GetProcessMemoryInfo` peak working sets. The exact
+16 MiB CLI output fell from 157.23 to 153.72 MiB. The rejected oversized
+summary fell from 124.96 to 113.62 MiB. Peaks cover file input, analysis,
+serialization, and any output. Exit status, stdout, and stderr matched in
+every pair. These are process-level measurements for the two fixtures.
 
 Next useful work follows correctness evidence and real consumers. Candidate
 directions include safe stage ownership/cleanup and explicit data-dependence inputs for program
