@@ -68,6 +68,8 @@ Windows 的 Node.js CLI 会在创建暂存前拒绝该模式。其他平台须�
 
 新写入会尝试保存一份大小最多 4 KiB 的归属记录。Linux 用 procfs 的启动和 PID 命名空间信息核对进程，Windows 用系统 PowerShell 检查进程创建时间。如果本机无法取得身份，写出仍可继续。两种检查都只读，适用于可信本地目录。报告是当次观测；检查命令不会删除暂存或触碰报告数据。
 
+如果详细模式枚举期间父目录的内容有变化，且仍能确认是同一目录，报告会加上 `scan_complete: false`。已有观测仍会返回，归属记录有变化的条目标为未知。此时应重新扫描以查看最新列表。父目录被替换、无法读取，或目录内容变化且无法确认目录身份时沿用 I/O 报错。
+
 ## 输入与分析语义
 
 ```json
@@ -119,7 +121,7 @@ node _build/js/release/build/cmd/main/main.js loop-boundary examples/branch-loop
 ## SDK
 
 ```sh
-moon add Novanke/cairndom@0.8.14
+moon add Novanke/cairndom@0.8.15
 ```
 
 在调用方 `moon.pkg` 中导入 `"Novanke/cairndom" @dom`。可直接构建 `Graph`，或调用 `parse_graph`。核心入口为 `analyze`，也可单独调用 `dominators` 或 `postdominators`。图边使用节点数组索引。只需要自然循环边界或控制依赖证据时，可以直接调用相应查询，结果沿用完整分析的图校验和排序规则。

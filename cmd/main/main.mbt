@@ -118,7 +118,8 @@ extern "js" fn file_io(
   #|     const target = path.resolve(input);
   #|     if (receipt) receipt.outputPath = target;
   #|     checkLinks(target, operation === 'write' || durable);
-  #|     if (operation === 'inspect-stages') {
+  #|     const taskInspection = operation === 'inspect-stage-tasks';
+  #|     if (operation === 'inspect-stages' || taskInspection) {
   #|       const stat = file => fs.lstatSync(file, {bigint:true});
   #|       const root = stat(target);
   #|       if (!root.isDirectory()) throw Error('inspection input must be a directory');
@@ -221,8 +222,14 @@ extern "js" fn file_io(
   #|       } finally { scan.closeSync(); }
   #|       checkLinks(target);
   #|       const after = stat(target);
-  #|       if (!after.isDirectory() || stamp(root) !== stamp(after)) throw Error('inspection directory changed during reading');
-  #|       return {error:'', directory:target, rows};
+  #|       const complete = stamp(root) === stamp(after);
+  #|       const sameRoot = after.isDirectory() && root.ino > 0n &&
+  #|         root.dev === after.dev && identity(root) === identity(after);
+  #|       if (!after.isDirectory() || (!complete && !(taskInspection && sameRoot)) ||
+  #|           (taskInspection && root.ino > 0n && !sameRoot)) {
+  #|         throw Error('inspection directory changed during reading');
+  #|       }
+  #|       return {error:'', directory:target, rows, complete};
   #|     }
   #|     if (operation === 'read') {
   #|       const declared = fs.lstatSync(target, {bigint:true});

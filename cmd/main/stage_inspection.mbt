@@ -13,6 +13,10 @@ extern "js" fn IoResult::stage_rows(
   #| result => result.rows
 
 ///|
+extern "js" fn IoResult::stage_scan_complete(self : Self) -> Bool =
+  #| result => result.complete
+
+///|
 extern "js" fn StageObservation::name(self : Self) -> String =
   #| entry => entry.name
 
@@ -50,7 +54,11 @@ fn inspect_stages_command(args : Array[String]) -> Unit raise CommandError {
     _ => raise CommandError("usage", "expected inspect-stages [--] DIRECTORY")
   }
   let result = file_io(
-    "inspect-stages",
+    if tasks {
+      "inspect-stage-tasks"
+    } else {
+      "inspect-stages"
+    },
     directory,
     "",
     _ => (),
@@ -102,7 +110,9 @@ fn inspect_stages_command(args : Array[String]) -> Unit raise CommandError {
     if tasks {
       if current && owner is Some(record) {
         fields["ownership"] = Json::string("recorded")
-        fields["activity"] = Json::string(stage_activity(record, probes))
+        fields["activity"] = Json::string(
+          stage_activity(record, probes.context(), probes.state(record.pid)),
+        )
         fields["task_id"] = Json::string(record.task)
         fields["output"] = Json::string(record.output)
       } else {
@@ -130,6 +140,8 @@ fn inspect_stages_command(args : Array[String]) -> Unit raise CommandError {
   if !tasks {
     report_fields["ownership"] = Json::string("unverified")
     report_fields["activity"] = Json::string("unknown")
+  } else if !result.stage_scan_complete() {
+    report_fields["scan_complete"] = Json::boolean(false)
   }
   report_fields["entries"] = Json::array(entries)
   let report = Json::object(report_fields).stringify(indent=2) + "\n"

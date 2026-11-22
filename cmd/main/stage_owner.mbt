@@ -47,6 +47,13 @@ fn stage_hex_id(value : StringView, length : Int32) -> Bool {
 }
 
 ///|
+fn stage_start_token(value : String) -> Bool {
+  !value.is_empty() &&
+  value.length() <= 20 &&
+  value[:].iter().all(ch => ch >= '0' && ch <= '9')
+}
+
+///|
 fn read_stage_owner(binding : String, marker : String) -> StageOwner? {
   if binding.is_empty() || marker.is_empty() {
     return None
@@ -81,25 +88,26 @@ fn read_stage_owner(binding : String, marker : String) -> StageOwner? {
     output.is_empty() ||
     output.contains("/") ||
     !(scope_hash is Some(hash) && stage_hex_id(hash, 64)) ||
-    started.is_empty() ||
-    started.length() > 20 ||
-    !started[:].iter().all(ch => ch >= '0' && ch <= '9') {
+    !stage_start_token(started) {
     return None
   }
   Some({ task, output, pid, scope, started, })
 }
 
 ///|
-fn stage_activity(owner : StageOwner, probes : StageProcesses) -> String {
-  if probes.context() != owner.scope {
+fn stage_activity(
+  owner : StageOwner,
+  scope : String,
+  sample : String,
+) -> String {
+  if scope != owner.scope {
     return "unknown"
   }
-  let sample = probes.state(owner.pid)
-  if sample.is_empty() {
-    "unknown"
-  } else if sample == owner.started {
+  if sample == owner.started {
     "active"
-  } else {
+  } else if sample == "dead" || stage_start_token(sample) {
     "abandoned"
+  } else {
+    "unknown"
   }
 }

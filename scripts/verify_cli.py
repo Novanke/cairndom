@@ -209,7 +209,8 @@ fs.linkSync = () => {
         before = set(root.rglob("*"))
         expected = checks.reference.run("stage-report", [str(root), stage.name, empty.name, linked.name])
         require(json.loads(checks.invoke(command)) == expected, "incorrect stage observations")
-        report = json.loads(checks.invoke(tasks))
+        stable = checks.invoke(tasks)
+        report = json.loads(stable)
         require(report["schema"] == "cairndom.stage-inspection.v2", "wrong task report schema")
         entries = {entry["name"]: entry for entry in report["entries"]}
         dead = entries[stage.name]
@@ -223,6 +224,23 @@ fs.linkSync = () => {
                 and owner.read_bytes() == marker
                 and target.read_bytes() == b"existing output" and os.path.samefile(linked / "data", target),
                 "inspection changed files or hard links")
+        churn = checks.failure_preload("stage-scan-churn", """
+const open = fs.opendirSync;
+fs.opendirSync = (path, ...options) => {
+  const dir = open(path, ...options);
+  if (path === process.argv.at(-1)) {
+    const close = dir.closeSync.bind(dir);
+    dir.closeSync = () => { fs.mkdtempSync(path + '/unrelated-'); close(); };
+  }
+  return dir;
+};
+""")
+        partial = json.loads(checks.invoke(tasks, preload=churn))
+        require(partial.pop("scan_complete", None) is False and partial == report,
+                "scan did not preserve confirmed tasks with incomplete coverage")
+        checks.invoke(command, preload=churn,
+                      error={"error": "io", "detail": "inspection directory changed during reading"})
+        require(checks.invoke(tasks) == stable, "stable task report bytes changed")
 
 
 def verify_durable_output(checks, graph, legacy, fixtures):

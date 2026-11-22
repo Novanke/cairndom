@@ -65,6 +65,8 @@
 - Record the owner of a staged report and offer a read-only task inspection.
   Verify Linux and Windows process instances and report unknown on absent
   or inconsistent evidence. Preserve the original structure report.
+- Keep individually confirmed task observations when sibling entries change
+  inside the same inspection directory. Mark that scan as incomplete.
 
 ## Next candidates
 

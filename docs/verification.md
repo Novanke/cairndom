@@ -495,6 +495,20 @@ Windows local verification passed 97 tests per backend, all SDK examples and
 445 real CLI invocations with Node.js 22.16.0 and moonc 0.10.20+65efd5b93.
 The local host lacked symlink creation capability and POSIX FIFO support.
 
+In 0.8.15 detailed stage inspection can return observations during sibling
+directory-entry changes. If the parent identity still matches, the report
+marks `scan_complete: false` and checks the individual owner records before
+reporting activity. This optional field applies to a scan that previously
+failed with an I/O diagnostic. Stable detailed reports and the original v1
+format keep their existing output. A missing or replaced parent still fails
+the directory check. The host regression creates an unrelated sibling entry as
+enumeration finishes and exercises both command forms on the same stage. The
+MoonBit CLI regression covers an unchanged process, PID reuse, confirmed exit,
+missing or unrecognized process evidence, and mismatched process scopes.
+Local Windows verification passed 97 Wasm GC tests, 98 JavaScript tests, all
+three SDK examples on both backends, and 448 real CLI invocations on the same
+toolchain. Symlink creation and the POSIX FIFO test were unavailable locally.
+
 Next useful work follows correctness evidence and real consumers. Candidate
 directions include safe stage ownership/cleanup and explicit data-dependence inputs for program
 slicing. General source-language/IR parsing,
