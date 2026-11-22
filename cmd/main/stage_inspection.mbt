@@ -21,45 +21,118 @@ extern "js" fn StageObservation::observation(self : Self) -> String =
   #| entry => entry.observation
 
 ///|
+extern "js" fn StageObservation::has_marker(self : Self) -> Bool =
+  #| entry => !!entry.hasMarker
+
+///|
+extern "js" fn StageObservation::binding(self : Self) -> String =
+  #| entry => entry.binding || ''
+
+///|
+extern "js" fn StageObservation::marker(self : Self) -> String =
+  #| entry => entry.marker || ''
+
+///|
+extern "js" fn StageObservation::still_current(self : Self) -> Bool =
+  #| entry => !!entry.confirm && entry.confirm()
+
+///|
 fn inspect_stages_command(args : Array[String]) -> Unit raise CommandError {
-  let directory = match args {
-    ["inspect-stages", "--", directory] if !directory.is_empty() => directory
+  let (directory, tasks) = match args {
+    ["inspect-stages", "--tasks", "--", directory] if !directory.is_empty() =>
+      (directory, true)
+    ["inspect-stages", "--tasks", directory] if !directory.is_empty() &&
+      !directory.has_prefix("-") => (directory, true)
+    ["inspect-stages", "--", directory] if !directory.is_empty() =>
+      (directory, false)
     ["inspect-stages", directory] if !directory.is_empty() &&
-      !directory.has_prefix("-") => directory
+      !directory.has_prefix("-") => (directory, false)
     _ => raise CommandError("usage", "expected inspect-stages [--] DIRECTORY")
   }
-  let result = file_io("inspect-stages", directory, "", detail => {
-    print_error("io", detail)
-  })
+  let result = file_io(
+    "inspect-stages",
+    directory,
+    "",
+    _ => (),
+    stage_owner_marker,
+  )
   if result.error() != "" {
     raise CommandError("io", result.error())
   }
   let observations = result.stage_rows()[:].to_owned()
   observations.sort_by((left, right) => left.name().compare(right.name()))
-  let entries = observations.map(entry => {
-    let observation = entry.observation()
+  let owners = observations.map(entry => {
+    read_stage_owner(entry.binding(), entry.marker())
+  })
+  let pids = []
+  if tasks {
+    for value in owners {
+      if value is Some(owner) {
+        pids.push(owner.pid)
+      }
+    }
+  }
+  let probes = stage_processes(FixedArray::from_array(pids[:]))
+  let entries = observations.mapi((index, entry) => {
+    let owner = owners[index]
+    let current = tasks && owner is Some(_) && entry.still_current()
+    let physical = entry.observation()
+    let observation = if tasks && owner is Some(_) && !current {
+      "changed"
+    } else if entry.has_marker() &&
+      owner is None &&
+      (
+        physical == "empty" ||
+        physical == "data_only" ||
+        physical == "data_with_other_links"
+      ) {
+      "unexpected_contents"
+    } else {
+      physical
+    }
     let possible_residue = match observation {
       "empty" | "data_only" | "data_with_other_links" => true
       _ => false
     }
-    Json::object(
-      Map([
-        ("name", Json::string(entry.name())),
-        ("observation", Json::string(observation)),
-        ("possible_residue", Json::boolean(possible_residue)),
-      ]),
-    )
+    let fields = Map([
+      ("name", Json::string(entry.name())),
+      ("observation", Json::string(observation)),
+      ("possible_residue", Json::boolean(possible_residue)),
+    ])
+    if tasks {
+      if current && owner is Some(record) {
+        fields["ownership"] = Json::string("recorded")
+        fields["activity"] = Json::string(stage_activity(record, probes))
+        fields["task_id"] = Json::string(record.task)
+        fields["output"] = Json::string(record.output)
+      } else {
+        fields["ownership"] = Json::string("unverified")
+        fields["activity"] = Json::string("unknown")
+        fields["task_id"] = Json::null()
+        fields["output"] = Json::null()
+      }
+    }
+    Json::object(fields)
   })
-  let report = Json::object(
-      Map([
-        ("schema", Json::string("cairndom.stage-inspection.v1")),
-        ("directory", Json::string(result.stage_directory())),
-        ("ownership", Json::string("unverified")),
-        ("activity", Json::string("unknown")),
-        ("entries", Json::array(entries)),
-      ]),
-    ).stringify(indent=2) +
-    "\n"
+  let report_fields = Map([
+    (
+      "schema",
+      Json::string(
+        if tasks {
+          "cairndom.stage-inspection.v2"
+        } else {
+          "cairndom.stage-inspection.v1"
+        },
+      ),
+    ),
+    ("directory", Json::string(result.stage_directory())),
+  ])
+  if !tasks {
+    report_fields["ownership"] = Json::string("unverified")
+    report_fields["activity"] = Json::string("unknown")
+  }
+  report_fields["entries"] = Json::array(entries)
+  let report = Json::object(report_fields).stringify(indent=2) + "\n"
   if utf8_byte_length(report) > 16777216 {
     raise CommandError("limit", "output exceeds 16 MiB")
   }

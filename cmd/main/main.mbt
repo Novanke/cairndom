@@ -49,9 +49,11 @@ extern "js" fn file_io(
   input : String,
   text : String,
   stdout_error : (String) -> Unit,
+  owner_marker : (String, String) -> String,
 ) -> IoResult =
-  #| (operation, input, text, stdoutError) => {
+  #| (operation, input, text, stdoutError, ownerMarker) => {
   #|   let fs, path, fd, stage, stageId, dataPath, dataId;
+  #|   let markerPath, markerId;
   #|   let parent, parentFd, parentId;
   #|   const durable = operation === 'write-durable';
   #|   const receipt = durable ? {
@@ -60,6 +62,9 @@ extern "js" fn file_io(
   #|   } : null;
   #|   const identity = s => `${process.platform === 'win32' ? 'win' : s.dev}:${s.ino}:${s.birthtimeNs}`;
   #|   const stamp = (s, device = s.dev) => `${device}:${s.ino}:${s.size}:${s.mtimeNs}:${s.ctimeNs}`;
+  #|   const stageBinding = (root, directory, name) =>
+  #|     root.isDirectory() && directory.isDirectory() && root.ino > 0n && directory.ino > 0n ?
+  #|       `${root.dev}:${identity(root)}|${directory.dev}:${identity(directory)}|${name}` : '';
   #|   const closeOwned = () => {
   #|     const owned = fd;
   #|     fd = undefined;
@@ -117,35 +122,89 @@ extern "js" fn file_io(
   #|       const stat = file => fs.lstatSync(file, {bigint:true});
   #|       const root = stat(target);
   #|       if (!root.isDirectory()) throw Error('inspection input must be a directory');
+  #|       const readOwner = file => {
+  #|         let handle;
+  #|         try {
+  #|           const before = stat(file);
+  #|           if (!before.isFile() || before.nlink !== 1n ||
+  #|               before.size < 1n || before.size > 4096n) return null;
+  #|           const sealed = stamp(before);
+  #|           const {O_RDONLY, O_NOFOLLOW, O_NONBLOCK} = fs.constants;
+  #|           handle = fs.openSync(file, O_RDONLY | (O_NOFOLLOW || 0) | (O_NONBLOCK || 0));
+  #|           const sameDescriptor = () => {
+  #|             const s = fs.fstatSync(handle, {bigint:true});
+  #|             return s.isFile() && s.nlink === 1n &&
+  #|               stamp(s, process.platform === 'win32' ? before.dev : s.dev) === sealed;
+  #|           };
+  #|           const sameName = () => {
+  #|             const s = stat(file);
+  #|             return s.isFile() && s.nlink === 1n && stamp(s) === sealed;
+  #|           };
+  #|           if (!sameDescriptor() || !sameName()) return null;
+  #|           const bytes = new Uint8Array(Number(before.size));
+  #|           let used = 0;
+  #|           while (used < bytes.length) {
+  #|             const count = fs.readSync(handle, bytes, used, bytes.length - used, used);
+  #|             if (count <= 0) return null;
+  #|             used += count;
+  #|           }
+  #|           if (!sameDescriptor() || !sameName()) return null;
+  #|           return {text:new TextDecoder('utf-8', {fatal:true}).decode(bytes), sameName};
+  #|         } catch { return null; }
+  #|         finally {
+  #|           if (handle !== undefined) { try { fs.closeSync(handle); } catch {} }
+  #|         }
+  #|       };
   #|       const observe = name => {
   #|         const candidate = path.join(target, name);
+  #|         const row = observation => ({name, observation});
   #|         try {
   #|           const before = stat(candidate);
-  #|           if (before.isSymbolicLink()) return 'symbolic_link';
-  #|           if (!before.isDirectory()) return 'not_directory';
-  #|           const contents = fs.opendirSync(candidate, {bufferSize:2});
-  #|           let first, second;
+  #|           if (before.isSymbolicLink()) return row('symbolic_link');
+  #|           if (!before.isDirectory()) return row('not_directory');
+  #|           const contents = fs.opendirSync(candidate, {bufferSize:3});
+  #|           const names = [];
   #|           try {
-  #|             first = contents.readSync();
-  #|             second = first && contents.readSync();
+  #|             for (let item; names.length < 3 && (item = contents.readSync());) names.push(item.name);
   #|           } finally { contents.closeSync(); }
-  #|           let observation = first ? 'unexpected_contents' : 'empty';
-  #|           if (first && !second && first.name === 'data') {
+  #|           const known = names.length < 3 && names.every(file => file === 'data' || file === 'owner.json');
+  #|           let observation = known ? 'empty' : 'unexpected_contents';
+  #|           if (known && names.includes('data')) {
   #|             const data = path.join(candidate, 'data');
   #|             const file = stat(data);
   #|             if (file.isFile()) {
   #|               const again = stat(data);
   #|               if (!again.isFile() || stamp(file) !== stamp(again) || file.nlink !== again.nlink) {
-  #|                 return 'changed';
+  #|                 observation = 'changed';
+  #|               } else if (file.nlink === 1n) {
+  #|                 observation = 'data_only';
+  #|               } else if (file.nlink > 1n) {
+  #|                 observation = 'data_with_other_links';
+  #|               } else {
+  #|                 observation = 'unexpected_contents';
   #|               }
-  #|               if (file.nlink === 1n) observation = 'data_only';
-  #|               else if (file.nlink > 1n) observation = 'data_with_other_links';
-  #|             }
+  #|             } else observation = 'unexpected_contents';
   #|           }
+  #|           const hasMarker = known && names.includes('owner.json');
+  #|           const marker = hasMarker && observation !== 'unexpected_contents' ?
+  #|             readOwner(path.join(candidate, 'owner.json')) : null;
   #|           const after = stat(candidate);
-  #|           return after.isDirectory() && stamp(before) === stamp(after) ? observation : 'changed';
+  #|           if (!after.isDirectory() || stamp(before) !== stamp(after)) return row('changed');
+  #|           const binding = stageBinding(root, before, name);
+  #|           const confirm = () => {
+  #|             try {
+  #|               checkLinks(candidate);
+  #|               const current = stat(candidate);
+  #|               return stageBinding(stat(target), current, name) === binding &&
+  #|                 stamp(current) === stamp(before) && marker.sameName();
+  #|             } catch { return false; }
+  #|           };
+  #|           return marker ? {
+  #|             name, observation, hasMarker, marker:marker.text, confirm,
+  #|             binding,
+  #|           } : {name, observation, hasMarker};
   #|         } catch (error) {
-  #|           return error.code === 'ENOENT' || error.code === 'ENOTDIR' ? 'changed' : 'unreadable';
+  #|           return row(error.code === 'ENOENT' || error.code === 'ENOTDIR' ? 'changed' : 'unreadable');
   #|         }
   #|       };
   #|       const rows = [];
@@ -156,7 +215,7 @@ extern "js" fn file_io(
   #|           if (++count > 4096) throw Error('inspection directory has more than 4096 entries');
   #|           const name = entry.name;
   #|           if (/^[.]cairndom-[A-Za-z0-9]{6}$/.test(name) && name.length === 16) {
-  #|             rows.push({name, observation:observe(name)});
+  #|             rows.push(observe(name));
   #|           }
   #|         }
   #|       } finally { scan.closeSync(); }
@@ -231,7 +290,23 @@ extern "js" fn file_io(
   #|       receipt.stageCreated = true;
   #|       receipt.stagePath = stage;
   #|     }
-  #|     stageId = identity(fs.lstatSync(stage, {bigint:true}));
+  #|     const stageStat = fs.lstatSync(stage, {bigint:true});
+  #|     stageId = identity(stageStat);
+  #|     // Owner metadata is best effort and never gates publishing the report.
+  #|     let ownerFd;
+  #|     try {
+  #|       const root = fs.lstatSync(parent, {bigint:true});
+  #|       const record = ownerMarker(stageBinding(root, stageStat, path.basename(stage)), path.basename(target));
+  #|       const info = new TextEncoder().encode(record);
+  #|       if (info.length && info.length <= 4096) {
+  #|         markerPath = path.join(stage, 'owner.json');
+  #|         ownerFd = fs.openSync(markerPath, 'wx', 0o600);
+  #|         markerId = identity(fs.fstatSync(ownerFd, {bigint:true}));
+  #|         fs.writeFileSync(ownerFd, info);
+  #|       }
+  #|     } catch {} finally {
+  #|       if (ownerFd !== undefined) { try { fs.closeSync(ownerFd); } catch {} }
+  #|     }
   #|     dataPath = path.join(stage, 'data');
   #|     fd = fs.openSync(dataPath, 'wx', 0o644);
   #|     dataId = identity(fs.fstatSync(fd, {bigint:true}));
@@ -269,9 +344,19 @@ extern "js" fn file_io(
   #|         const directory = fs.lstatSync(stage, {bigint:true});
   #|         if (directory.isDirectory() && identity(directory) === stageId) {
   #|           const names = fs.readdirSync(stage);
-  #|           if (names.length === 1 && names[0] === 'data' && dataId) {
+  #|           const ownerMatches = () => {
+  #|             const owner = fs.lstatSync(markerPath, {bigint:true});
+  #|             return owner.isFile() && owner.nlink === 1n && identity(owner) === markerId;
+  #|           };
+  #|           const hasOwner = names.includes('owner.json');
+  #|           if (names.includes('data') && dataId && (names.length === 1 ||
+  #|               (names.length === 2 && hasOwner && markerId && ownerMatches()))) {
   #|             const data = fs.lstatSync(dataPath, {bigint:true});
   #|             if (data.isFile() && identity(data) === dataId) fs.unlinkSync(dataPath);
+  #|           }
+  #|           const remaining = fs.readdirSync(stage);
+  #|           if (remaining.length === 1 && remaining[0] === 'owner.json' && markerId && ownerMatches()) {
+  #|             fs.unlinkSync(markerPath);
   #|           }
   #|           if (fs.readdirSync(stage).length === 0) {
   #|             fs.rmdirSync(stage);
@@ -313,9 +398,13 @@ fn io(
   path : String,
   text~ : String = "",
 ) -> String raise CommandError {
-  let result = file_io(operation, path, text, detail => {
-    print_error("io", detail)
-  })
+  let result = file_io(
+    operation,
+    path,
+    text,
+    detail => print_error("io", detail),
+    stage_owner_marker,
+  )
   if result.error() != "" {
     raise CommandError("io", result.error())
   }
@@ -583,7 +672,7 @@ fn run_command(args : Array[String]) -> Unit raise {
           "trace-use INPUT --node NODE_ID --variable VARIABLE_ID [--out NEW_FILE] [--durable]\n" +
           "control-witness INPUT --controller NODE_ID --successor NODE_ID [--out NEW_FILE] [--durable]\n" +
           "loop-boundary INPUT --header NODE_ID [--out NEW_FILE] [--durable]\n" +
-          "inspect-stages [--] DIRECTORY\n" +
+          "inspect-stages [--tasks] [--] DIRECTORY\n" +
           "help\n" +
           "JSON is the default format. Without --out, the result is written to stdout.\n" +
           "json-summary keeps node-level analysis and omits edge-witness expansion.\n" +

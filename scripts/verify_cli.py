@@ -2,7 +2,9 @@
 """Exercise real graph files; independent algorithms and cases run in MoonBit."""
 import json
 import os
+import subprocess
 import tempfile
+import time
 from pathlib import Path
 from host import require, run_checks
 
@@ -165,15 +167,36 @@ process.on("exit", () => {{ if (reads < {phase}) process.exitCode = 92; }});
 
 
 def verify_stage_inspection(checks, graph):
-    stop = checks.failure_preload("interrupt-publication", "fs.linkSync = () => process.exit(91);")
+    stop = checks.failure_preload("interrupt-publication", """
+fs.linkSync = () => {
+  fs.writeFileSync(process.argv.at(-1) + ".ready", "");
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0);
+};
+""")
     with tempfile.TemporaryDirectory(prefix="cairndom-stage-test-") as directory:
         root = Path(directory).resolve()
         target = root / "report.json"
-        checks.invoke(["analyze", graph, "--out", target], preload=stop, exit_code=91)
+        ready = root / "report.json.ready"
+        tasks = ["inspect-stages", "--tasks", root]
+        args = [checks.node, "--import", stop.as_uri(), str(checks.cli), "analyze", graph, "--out", target]
+        writer = subprocess.Popen(args, cwd=checks.work)
+        try:
+            for _ in range(1000):
+                if ready.exists() or writer.poll() is not None:
+                    break
+                time.sleep(0.02)
+            require(ready.exists(), "writer did not reach publication")
+            stage, = root.glob(".cairndom-*")
+            data, owner = stage / "data", stage / "owner.json"
+            original, marker = data.read_bytes(), owner.read_bytes()
+            active, = json.loads(checks.invoke(tasks))["entries"]
+            require((active["ownership"], active["activity"], active["output"]) ==
+                    ("recorded", "active", target.name) and active["task_id"], "wrong active writer")
+        finally:
+            writer.kill()
+            writer.wait(timeout=10)
+        checks.calls += 1
         require(not target.exists(), "report survived interruption")
-        stage, = root.iterdir()
-        data = stage / "data"
-        original = data.read_bytes()
         fixtures = [root / (".cairndom-00000" + digit) for digit in "123"]
         empty, linked = [path for path in fixtures if path != stage][:2]
         foreign = root / ".cairndom-foreign"
@@ -186,8 +209,18 @@ def verify_stage_inspection(checks, graph):
         before = set(root.rglob("*"))
         expected = checks.reference.run("stage-report", [str(root), stage.name, empty.name, linked.name])
         require(json.loads(checks.invoke(command)) == expected, "incorrect stage observations")
+        report = json.loads(checks.invoke(tasks))
+        require(report["schema"] == "cairndom.stage-inspection.v2", "wrong task report schema")
+        entries = {entry["name"]: entry for entry in report["entries"]}
+        dead = entries[stage.name]
+        require(dead["activity"] == "abandoned" and dead["task_id"] == active["task_id"], "wrong abandoned writer")
+        for legacy in (empty, linked):
+            entry = entries[legacy.name]
+            require((entry["ownership"], entry["activity"], entry["task_id"]) ==
+                    ("unverified", "unknown", None), "wrong legacy ownership")
         checks.invoke([*command, "--out", target], error=True)
         require(before == set(root.rglob("*")) and data.read_bytes() == original
+                and owner.read_bytes() == marker
                 and target.read_bytes() == b"existing output" and os.path.samefile(linked / "data", target),
                 "inspection changed files or hard links")
 

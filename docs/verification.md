@@ -466,6 +466,35 @@ for `parse_graph` and 1.759 to 1.783 ms for a typed witness query, which
 continues to validate each input. Process peaks were 79.41 to 79.49 MiB
 and 60.82 to 59.62 MiB respectively. All timed results matched.
 
+In 0.8.14 both report output modes can record an owner within the stage before
+writing data. MoonBit validates the versioned owner record and classifies
+activity from its local process scope, PID and start token. The record binds
+the parent and stage directory identities and the original stage name.
+The filesystem adapter bounds owner reads to 4 KiB and checks stable path or
+descriptor identity. It accepts a single-linked regular owner file and
+rechecks the directory and marker after the process snapshot.
+
+Linux uses the procfs boot and PID namespace identities and the process start
+tick. Windows uses the local machine scope and the process creation time via
+one hidden, time-limited Windows PowerShell probe. Confirmed absence, a
+terminated process, or reuse of a PID within the matching scope yields
+`abandoned`. Unavailable evidence yields `unknown`. The marker belongs to
+the trusted-local workflow and is not an authentication mechanism. Cleanup
+still targets only files created by the current writer. Inspection only reads
+filesystem and process evidence and cannot establish publication on its own.
+
+The host test pauses a real writer before the publication step, inspects
+`active`, kills and reaps it, then verifies `abandoned` with the same task
+ID and output name. Legacy names still report `unknown` in detailed mode.
+An external comparison matched six legacy v1 entries byte for byte with
+0.8.13. It also checked missing, malformed and oversized metadata, a copied
+marker in another directory, and a stage containing an unrelated file.
+Snapshots of stage contents, report data and a preexisting hard link survived
+repeated inspection. The owner and data remain available in a retained stage.
+Windows local verification passed 97 tests per backend, all SDK examples and
+445 real CLI invocations with Node.js 22.16.0 and moonc 0.10.20+65efd5b93.
+The local host lacked symlink creation capability and POSIX FIFO support.
+
 Next useful work follows correctness evidence and real consumers. Candidate
 directions include safe stage ownership/cleanup and explicit data-dependence inputs for program
 slicing. General source-language/IR parsing,

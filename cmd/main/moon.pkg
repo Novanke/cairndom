@@ -1,5 +1,6 @@
 import {
   "Novanke/cairndom" @cairn,
+  "moonbitlang/core/json",
 }
 
 options(

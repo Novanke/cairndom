@@ -44,7 +44,7 @@ fn write_durable_output(
   path : String,
   text : String,
 ) -> Unit raise CommandError {
-  let result = file_io("write-durable", path, text, _ => ())
+  let result = file_io("write-durable", path, text, _ => (), stage_owner_marker)
   let published = result.published()
   let directory_synced = result.directory_synced()
   let stage_created = result.stage_created()

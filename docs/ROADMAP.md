@@ -62,14 +62,17 @@
 - Validate graph and program input separately from copying it. Reuse the
   decoded graph and its name index in valid program and query files, and
   retain independent arrays for saved analyses and inspection copies.
+- Record the owner of a staged report and offer a read-only task inspection.
+  Verify Linux and Windows process instances and report unknown on absent
+  or inconsistent evidence. Preserve the original structure report.
 
 ## Next candidates
 
 Prioritize observed correctness problems and reproducible consumers.
 
-1. **Stage ownership.** Evaluate an ownership and activity protocol before
-   considering cleanup. Existing stage observations describe the filesystem
-   at scan time in a trusted local directory.
+1. **Stage recovery.** Define a separate policy for reviewing retained reports.
+   Inspection reports observations from a trusted local directory, and task
+   termination alone does not establish whether publication completed.
 2. **Program slicing.** Define explicit data-dependence inputs before exposing
    a slicing API. Document which relationships clients must supply.
 

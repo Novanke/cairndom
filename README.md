@@ -21,6 +21,7 @@ node _build/js/release/build/cmd/main/main.js trace-values examples/value-origin
 node _build/js/release/build/cmd/main/main.js trace-values examples/value-origins.json --out value-origins.json
 node _build/js/release/build/cmd/main/main.js trace-use examples/value-origins.json --node join --variable value
 node _build/js/release/build/cmd/main/main.js inspect-stages .
+node _build/js/release/build/cmd/main/main.js inspect-stages --tasks .
 ```
 
 样例报告中，`left` 和 `right` 的支配边界都是 `join`，`head` 与 `body` 形成一个以 `head` 为头的自然循环，`dead` 不可达。蓝色虚线 DOT 边是直接支配关系，普通边保留原始控制流。DOT 是图描述文件，可由支持该格式的工具进一步渲染。
@@ -54,10 +55,18 @@ Windows 的 Node.js CLI 会在创建暂存前拒绝该模式。其他平台须�
 
 报告写入中断后，可运行 `inspect-stages DIRECTORY` 检查原输出文件的父目录。命令仅检查该目录的直接子项，最多扫描 4,096 项，识别名称为 `.cairndom-` 加六位 ASCII 字母或数字的候选，按名称排序，将 `cairndom.stage-inspection.v1` JSON 写到 stdout。以短横线开头的目录名可以写作 `inspect-stages -- DIRECTORY`。
 
-- `empty` 表示空目录，`data_only` 表示只有一个链接数为一的普通 `data` 文件，`data_with_other_links` 表示该文件还有其他硬链接。这三种状态的 `possible_residue` 为 `true`。
+- `empty` 表示没有报告数据，`data_only` 表示只有链接数为一的普通 `data` 文件，`data_with_other_links` 表示该文件还有其他硬链接。与目录身份相符的任务记录单独识别。这三种状态的 `possible_residue` 为 `true`，该字段描述文件形态。
 - 候选若不是目录、含有额外或异常内容、是符号链接、在扫描中变化或无法读取，分别报告 `not_directory`、`unexpected_contents`、`symbolic_link`、`changed` 或 `unreadable`。符号链接形式的扫描目录或祖先路径会报错。
 
-扫描只读取目录项和文件元数据。报告中的 `ownership` 为 `unverified`，`activity` 为 `unknown`。额外硬链接仅说明文件还有其他目录项，文件是否已经发布需要另行核对。这是面向可信本地目录的顺序观测，供人工排查中断残留。
+默认 v1 报告顶层的 `ownership` 和 `activity` 仍分别为 `unverified` 和 `unknown`。额外硬链接只说明文件还有其他目录项，发布状态需要另行核对。
+
+用 `inspect-stages --tasks DIRECTORY` 获取逐目录的 `cairndom.stage-inspection.v2` 报告。每项的 `ownership: "recorded"` 表示已读取到绑定该目录的归属记录，`task_id` 为写入任务的随机标识，`output` 为原目标文件的文件名。旧目录、异常内容或记录无法确认时显示 `unverified`，两个字段为 `null`。
+
+- `active` 表示同一写入进程在采样时仍存活，也可能正准备发布或清理。
+- `abandoned` 表示已确认原进程终止或 PID 已被其他进程使用，且目录仍存在。例如进程被强制终止，或写出后的清理失败。
+- `unknown` 表示归属、进程或位置证据不足。进程权限受限、记录损坏、目录变动或来自不同主机范围都可能得到这个状态。
+
+新写入会尝试保存一份大小最多 4 KiB 的归属记录。Linux 用 procfs 的启动和 PID 命名空间信息核对进程，Windows 用系统 PowerShell 检查进程创建时间。如果本机无法取得身份，写出仍可继续。两种检查都只读，适用于可信本地目录。报告是当次观测；检查命令不会删除暂存或触碰报告数据。
 
 ## 输入与分析语义
 
@@ -110,7 +119,7 @@ node _build/js/release/build/cmd/main/main.js loop-boundary examples/branch-loop
 ## SDK
 
 ```sh
-moon add Novanke/cairndom@0.8.13
+moon add Novanke/cairndom@0.8.14
 ```
 
 在调用方 `moon.pkg` 中导入 `"Novanke/cairndom" @dom`。可直接构建 `Graph`，或调用 `parse_graph`。核心入口为 `analyze`，也可单独调用 `dominators` 或 `postdominators`。图边使用节点数组索引。只需要自然循环边界或控制依赖证据时，可以直接调用相应查询，结果沿用完整分析的图校验和排序规则。

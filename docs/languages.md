@@ -5,33 +5,35 @@ in MoonBit and checked on Wasm GC and JavaScript. JavaScript FFI is confined to
 the process/filesystem adapters in the production CLI and verification command.
 Python handles real files, subprocesses, pipes and host fault injection.
 
-The 0.8.13 source snapshot below uses canonical Git blob bytes, not build outputs
+The 0.8.14 source snapshot below uses canonical Git blob bytes, not build outputs
 or working-tree line endings. Comments are included. Generated `.mbti`, JSON
 fixtures and documentation are excluded from source rows.
 
 | Source category | Files | Bytes | Nonblank lines |
 | --- | ---: | ---: | ---: |
-| Production MoonBit, including CLI adapter | 25 | 114,956 | 3,511 |
+| Production MoonBit, including CLI adapter | 27 | 130,750 | 3,883 |
 | Core MoonBit regression tests | 18 | 142,294 | 4,453 |
 | MoonBit SDK examples | 3 | 4,790 | 137 |
 | Independent MoonBit verification implementation | 5 | 59,452 | 1,917 |
 | Verification selftests | 1 | 1,068 | 22 |
-| Python host adapter and entry points | 6 | 34,026 | 594 |
+| Python host adapter and entry points | 6 | 35,677 | 627 |
 
 For comparison with the repository language bar, exclude examples (which GitHub
-excluded from prior measurements). This leaves 317,770 MoonBit bytes, 34,026
+excluded from prior measurements). This leaves 333,564 MoonBit bytes, 35,677
 Python bytes and the 326-byte module manifest that GitHub previously classified
-as AMPL: approximately **90.24% MoonBit by that byte metric**. GitHub can classify
+as AMPL: approximately **90.26% MoonBit by that byte metric**. GitHub can classify
 files differently or update its cached bar later; its public languages API is
 the authority for the displayed value.
 
 The byte metric includes embedded FFI text. In particular, the CLI contains
-285 JavaScript payload lines and the verification process bridge contains 25.
+480 JavaScript payload lines and the verification process bridge contains 25.
 The verification inputs also carry a small JavaScript fault-injection preload.
 Do not interpret the language bar as a claim that every source byte is MoonBit,
 or count tests/reference tools as production functionality. No Linguist overrides
 are used; `.gitattributes` only sets text line endings.
 
+The 0.8.13 source measurement was 317,770 MoonBit bytes, 34,026 Python bytes
+and a 326-byte manifest (90.24% MoonBit by the same byte metric).
 The 0.8.12 public measurement was 314,367 MoonBit bytes, 34,026 Python bytes
 and 326 AMPL bytes (90.15% MoonBit), confirmed before this update.
 The 0.8.11 public measurement was 311,643 MoonBit bytes, 34,026 Python bytes
