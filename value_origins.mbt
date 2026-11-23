@@ -29,6 +29,9 @@ struct ValueOrigins {
 let max_value_origin_relations : Int32 = 65536
 
 ///|
+let value_origin_limit_message = "value-origin relation limit of 65536 exceeded"
+
+///|
 priv struct ValueOriginGraph {
   entry : Int32
   reachable : Array[Bool]
@@ -88,7 +91,7 @@ fn ValueOriginGraph::find_origins(
     cursor += 1
     if current == self.entry {
       if relations == budget {
-        raise Invalid("value-origin relation limit of 65536 exceeded")
+        raise Invalid(value_origin_limit_message)
       }
       relations += 1
       requires_entry_value = true
@@ -102,7 +105,7 @@ fn ValueOriginGraph::find_origins(
       if defined[previous] {
         if !sources[previous] {
           if relations == budget {
-            raise Invalid("value-origin relation limit of 65536 exceeded")
+            raise Invalid(value_origin_limit_message)
           }
           relations += 1
           sources[previous] = true
@@ -174,8 +177,9 @@ fn trace_use_checked(
 /// Results are ordered by node then variable, with definition blocks sorted by
 /// node index. At most 65,536 source/use relations are returned, counting each
 /// incoming-value flag as one source. Oversized complete results raise an error
-/// rather than returning a partial list. Each reverse search uses O(n) scratch
-/// space and O(n + e) work, without a block/variable/source state matrix.
+/// rather than returning a partial list. Variables without reachable
+/// definitions need no reverse search. Each other reverse search uses O(n)
+/// scratch space and O(n + e) work.
 pub fn trace_values(input : FlowProgram) -> ValueOrigins raise GraphError {
   validate_program(input)
   let program = copy_program(input)
@@ -184,8 +188,12 @@ pub fn trace_values(input : FlowProgram) -> ValueOrigins raise GraphError {
     program.variables.length(),
     _ => [],
   )
+  let has_definition = Array::make(program.variables.length(), false)
   for node, reachable in search.reachable {
     if reachable {
+      for variable in program.definitions[node] {
+        has_definition[variable] = true
+      }
       for variable in program.uses[node] {
         use_sites[variable].push(node)
       }
@@ -195,6 +203,23 @@ pub fn trace_values(input : FlowProgram) -> ValueOrigins raise GraphError {
   let mut relations = 0
   for variable, sites in use_sites {
     if sites.is_empty() {
+      continue
+    }
+    // Every reachable use has an entry path. With no reachable definition,
+    // the incoming value is its only possible source.
+    if !has_definition[variable] {
+      if sites.length() > max_value_origin_relations - relations {
+        raise Invalid(value_origin_limit_message)
+      }
+      relations += sites.length()
+      for node in sites {
+        origins.push({
+          node,
+          variable,
+          definitions: [],
+          requires_entry_value: true,
+        })
+      }
       continue
     }
     let defined = search.definition_sites(program, variable)

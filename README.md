@@ -121,7 +121,7 @@ node _build/js/release/build/cmd/main/main.js loop-boundary examples/branch-loop
 ## SDK
 
 ```sh
-moon add Novanke/cairndom@0.8.15
+moon add Novanke/cairndom@0.8.16
 ```
 
 在调用方 `moon.pkg` 中导入 `"Novanke/cairndom" @dom`。可直接构建 `Graph`，或调用 `parse_graph`。核心入口为 `analyze`，也可单独调用 `dominators` 或 `postdominators`。图边使用节点数组索引。只需要自然循环边界或控制依赖证据时，可以直接调用相应查询，结果沿用完整分析的图校验和排序规则。
@@ -238,7 +238,9 @@ let selected = @dom.trace_use(program, 3, 0)
 
 来源沿所有入口可达路径计算，包含永久循环；声明出口不会裁掉这些路径。同一块的使用发生在本地定义之前，但本块上一轮循环的定义可以成为来源。后续定义会阻断更早定义。`requires_entry_value` 表示原始入口值可能到达这个使用点，调用方应提供参数或初值，或按自身语言规则处理；它不直接证明源程序存在未初始化错误。这里不分析值、分支条件、别名或语句顺序，也不转换 IR。
 
-总来源关系上限为 **65,536**，每个使用点的入口值标志也计作一条关系；超过上限整体报错，不返回截断结果。每个使用点的反向搜索使用 O(n) 临时空间，工作量为 O(n + e)，另需存储完整结果；不承诺未经测量的耗时。JSON 为 `cairndom.value-origins.v1`，包括 `uses`、`unreachable_blocks`、`source_relation_count` 和 `source_relation_limit`，输出仍限制为 16 MiB。CLI 沿用新文件独占发布约定，分析失败时不会留下半份目标报告。
+全量分析会一次识别哪些变量在可达块中有定义。没有可达定义的变量直接记录入口值，包括定义只出现在不可达块的情况。需要反向搜索时，每个使用点使用 O(n) 临时空间，工作量为 O(n + e)，另需存储完整结果。
+
+总来源关系上限为 **65,536**，每个使用点的入口值标志也计作一条关系。超过上限整体报错。JSON 为 `cairndom.value-origins.v1`，包括 `uses`、`unreachable_blocks`、`source_relation_count` 和 `source_relation_limit`，输出仍限制为 16 MiB。CLI 沿用新文件独占发布约定，分析失败时不会留下半份目标报告。
 
 完整示例会执行断言并输出分析与 phi 候选点。
 

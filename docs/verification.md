@@ -509,6 +509,42 @@ Local Windows verification passed 97 Wasm GC tests, 98 JavaScript tests, all
 three SDK examples on both backends, and 448 real CLI invocations on the same
 toolchain. Symlink creation and the POSIX FIFO test were unavailable locally.
 
+In 0.8.16 full value-origin analysis gathers reachable uses and marks which
+variables have reachable definitions in the same scan. Every reachable use
+of a variable without a reachable definition gets one incoming-value
+relation. Variables with reachable definitions still use the existing
+predecessor search, including definitions from earlier loop iterations.
+The new regression combines reachable definitions, definitions confined
+to dead blocks, entry values and a permanent loop. It compares the saved
+rows with a forward oracle and the SDK single-use query. The existing
+capacity fixture exercises exactly 65,536 relations and rejects the next
+incoming-value relation with the same error.
+
+The CLI benchmark uses nodes `b0` through `b511` and 32 variables. Each
+participating node connects to the next 16 nodes in cyclic index order.
+The entry is `b0` and the declared exit list is empty. The read-only fixture
+uses all variables at every node. The unreachable fixture excludes `b511`
+from the cycle, defines all variables there and omits the first variable's
+use at `b510`. The mixed fixture defines the first eight variables at
+nodes 8, 128, 256 and 384 and omits uses at `b511`.
+
+Seven alternating pairs of fresh Node.js 22.16.0 processes on Windows
+compared the installed 0.8.15 CLI and the optimized 0.8.16 CLI. The times
+are fixture-specific median wall times for input, analysis and stdout.
+
+| Fixture | Report rows | 0.8.15 | 0.8.16 |
+| --- | ---: | ---: | ---: |
+| No definitions | 16,384 | 905 ms | 224 ms |
+| Definitions only in the unreachable block | 16,351 | 902 ms | 231 ms |
+| Mixed reachable definitions and entry values | 16,352 | 919 ms | 412 ms |
+
+Every timed result matched stdout, stderr and exit status. Five selected
+use queries, the relation limit and undeclared-use diagnostics, and one
+2,183,547-byte `--out` report also matched the prior release.
+Local verification passed 98 Wasm GC tests, 99 JavaScript tests, all
+three SDK examples on both backends and 448 real CLI invocations. The
+Windows host skipped symlink and POSIX FIFO checks due to platform capability.
+
 Next useful work follows correctness evidence and real consumers. Candidate
 directions include safe stage ownership/cleanup and explicit data-dependence inputs for program
 slicing. General source-language/IR parsing,

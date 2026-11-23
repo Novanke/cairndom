@@ -67,6 +67,8 @@
   or inconsistent evidence. Preserve the original structure report.
 - Keep individually confirmed task observations when sibling entries change
   inside the same inspection directory. Mark that scan as incomplete.
+- Report incoming-only values directly in full value-origin analysis when
+  a variable has no entry-reachable definition.
 
 ## Next candidates
 

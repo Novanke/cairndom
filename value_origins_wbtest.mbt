@@ -189,6 +189,28 @@ test "value origins explain uncovered branches overwrites and prior loop iterati
 }
 
 ///|
+test "bulk origins use only incoming values when definitions are unreachable" {
+  let program : FlowProgram = {
+    graph: {
+      nodes: ["dead", "entry", "loop"],
+      edges: [(1, 2), (2, 2), (0, 2)],
+      entry: 1,
+      exits: [],
+    },
+    variables: ["local", "dead_only", "parameter"],
+    definitions: [[1], [], [0]],
+    uses: [[1, 2], [2, 1], [2, 1, 0]],
+  }
+  let origins = trace_values(program).uses()
+  value_origins_test_equal(origins, value_origins_test_expected(program))
+  assert_eq(origins.length(), 5)
+  for origin in origins {
+    assert_eq(trace_use(program, origin.node, origin.variable), Some(origin))
+  }
+  assert_eq(trace_use(program, 0, 1), None)
+}
+
+///|
 test "value origins own their input every inspection copy and the saved report" {
   let input : FlowProgram = {
     graph: {
