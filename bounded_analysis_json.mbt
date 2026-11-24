@@ -81,21 +81,36 @@ fn BoundedJsonWriter::rows(
 fn BoundedJsonWriter::witness_rows(
   self : Self,
   graph : Graph,
-  witnesses : Array[ControlWitness],
+  post : DominatorTree,
+  count : Int32,
 ) -> Unit raise GraphError {
   self.field("control_witnesses")
   self.append("[")
-  if !witnesses.is_empty() {
+  if count > 0 {
+    let n = graph.nodes.length()
     let names = graph.nodes.map(name => Json::string(name).stringify())
-    for index, witness in witnesses {
-      if index > 0 {
-        self.append(",")
+    let mut remaining = count
+    for (controller_index, successor_index) in sorted_witness_edges(graph) {
+      let controller = names[controller_index]
+      let successor = names[successor_index]
+      let dependents = witness_dependents(
+        post, controller_index, successor_index, n,
+      )
+      for dependent_index in dependents {
+        if remaining == 0 {
+          break
+        }
+        if remaining != count {
+          self.append(",")
+        }
+        let dependent = names[dependent_index]
+        let row = "\n    {\n      \"controller\": \{controller},\n      \"successor\": \{successor},\n      \"dependent\": \{dependent}\n    }"
+        self.append(row[:])
+        remaining -= 1
       }
-      let controller = names[witness.controller]
-      let successor = names[witness.successor]
-      let dependent = names[witness.dependent]
-      let row = "\n    {\n      \"controller\": \{controller},\n      \"successor\": \{successor},\n      \"dependent\": \{dependent}\n    }"
-      self.append(row[:])
+      if remaining == 0 {
+        break
+      }
     }
     self.append("\n  ")
   }
@@ -133,17 +148,17 @@ fn bounded_analysis_json_text(
     out.rows(name, count, row)
   }
   if include_witnesses {
-    // The sorted prefix determines the completeness flag before the rows.
-    let (witnesses, complete) = bounded_control_witnesses_of(result)
+    let post = result.post.parent_tree()
     out.append(",\n")
     out.field("control_witnesses_complete")
+    let (count, complete) = control_witness_prefix_size(result.graph, post)
     out.append(if complete { "true" } else { "false" })
     out.append(",\n")
     out.field("control_witness_limit")
     let witness_limit = max_control_witnesses.to_string()
     out.append(witness_limit[:])
     out.append(",\n")
-    out.witness_rows(result.graph, witnesses)
+    out.witness_rows(result.graph, post, count)
   }
   out.append("\n}")
   out.buffer.to_string()

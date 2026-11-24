@@ -545,6 +545,44 @@ Local verification passed 98 Wasm GC tests, 99 JavaScript tests, all
 three SDK examples on both backends and 448 real CLI invocations. The
 Windows host skipped symlink and POSIX FIFO checks due to platform capability.
 
+In 0.8.17 bounded full JSON counts witnesses until the first witness beyond
+65,536, then writes the ordered prefix one original edge at a time. The
+writer holds at most one edge's dependent indices alongside its output.
+This preserves the completeness flag, numeric index order, field order
+and inclusive byte budget. The legacy JSON formatter and array-returning
+query remain available. Regression cases exercise 65,536 and 65,537
+witnesses, a truncated prefix ending inside one edge, and a byte limit
+that cuts off the first witness row. SDK and CLI exports still reject an
+over-budget result before returning it or publishing it to a file.
+
+The 98-node exact-limit fixture from `control_witness_wbtest.mbt` produces
+6,051,050 CLI stdout bytes. The 128-node fixture `witness_overflow_graph`
+induces 112,368 logical witnesses and produces a 6,116,701-byte report with
+the bounded prefix. Padding its node IDs to 64 ASCII bytes exceeds the
+byte budget. An independent check counted and compared every retained
+witness. Report bytes, error bytes, new-file output and refusal to
+overwrite an existing file matched 0.8.16.
+
+Seven alternating fresh process pairs used Node.js 22.16.0 on Windows.
+The following values are medians of wall time and peak working set over
+the full CLI run, including input, analysis and output.
+
+| Fixture | Wall time 0.8.16 to 0.8.17 | Peak working set 0.8.16 to 0.8.17 |
+| --- | ---: | ---: |
+| Exactly 65,536 witnesses | 272.31 to 268.99 ms | 82.26 to 78.79 MiB |
+| Truncated witness prefix | 289.86 to 268.86 ms | 87.89 to 79.38 MiB |
+| Oversized JSON body | 256.66 to 241.92 ms | 69.13 to 65.74 MiB |
+
+A separate SDK timing uses the 128-node fixture and a 143,832-byte budget
+that ends before the first witness row. Each fresh process prepared one
+analysis, warmed it with four calls and measured 12 export calls. Across
+seven alternating pairs, the median per-call time was 6.168 to 2.661 ms
+and process peak working set was 84.41 to 57.92 MiB. The byte-limit
+diagnostic matched in every call.
+Local verification passed 98 Wasm GC tests, 99 JavaScript tests, all three
+SDK examples on both backends and 448 CLI invocations. Windows skipped
+the symlink and POSIX FIFO cases due to local platform capability.
+
 Next useful work follows correctness evidence and real consumers. Candidate
 directions include safe stage ownership/cleanup and explicit data-dependence inputs for program
 slicing. General source-language/IR parsing,

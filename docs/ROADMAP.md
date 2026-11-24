@@ -69,6 +69,8 @@
   inside the same inspection directory. Mark that scan as incomplete.
 - Report incoming-only values directly in full value-origin analysis when
   a variable has no entry-reachable definition.
+- Count the bounded control-witness prefix before full JSON export and
+  serialize it one edge at a time under the existing byte budget.
 
 ## Next candidates
 

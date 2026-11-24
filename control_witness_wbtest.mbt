@@ -381,6 +381,8 @@ test "exactly 65536 witnesses remain complete and accepted by the SDK" {
   assert_eq(witnesses.length(), 65536)
   assert_eq(witnesses[65535], { controller: 32, successor: 96, dependent: 96, })
   assert_eq(control_dependence_witnesses(graph), witnesses)
+  let report = prepare_analysis(graph).json_text()
+  assert_true(report.contains("\"control_witnesses_complete\": true"))
   // One self-edge adds one self-control witness without changing exit paths.
   edges.push((1, 1))
   let (overflow, overflow_complete) = bounded_control_witnesses_of(
@@ -388,6 +390,8 @@ test "exactly 65536 witnesses remain complete and accepted by the SDK" {
   )
   assert_false(overflow_complete)
   assert_eq(overflow.length(), 65536)
+  let report_overflow = prepare_analysis(graph).json_text()
+  assert_true(report_overflow.contains("\"control_witnesses_complete\": false"))
   let error = try {
     ignore(control_dependence_witnesses(graph))
     ""

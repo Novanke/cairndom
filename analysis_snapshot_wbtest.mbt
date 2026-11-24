@@ -358,6 +358,17 @@ test "oversized saved analysis remains inspectable and DOT exportable while JSON
   let short_legacy = analysis_json_text(short_saved.analysis())
   let short_json = short_saved.json_text_limit(short_legacy.length())
   assert_eq(short_json, short_legacy)
+  let witness_opening = "\"control_witnesses\": ["
+  let within_first_witness = short_legacy.find(witness_opening[:]).unwrap() +
+    witness_opening.length() +
+    10
+  let budget_error = try {
+    ignore(short_saved.json_text_limit(within_first_witness))
+    ""
+  } catch {
+    Invalid(message) => message
+  }
+  assert_eq(budget_error, "analysis JSON exceeds the byte limit")
   let bounded = match @json.parse(short_json) {
     Object(object) => object
     _ => fail("expected an analysis report object")

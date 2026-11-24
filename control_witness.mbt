@@ -18,39 +18,95 @@ pub extend ControlWitness with Debug::{to_repr}
 let max_control_witnesses : Int32 = 65536
 
 ///|
-fn witness_dependents(
+// A false visitor result stops the walk before the remaining dependents.
+fn visit_witness_dependents(
   post : DominatorTree,
   controller : Int32,
   successor : Int32,
   node_count : Int32,
-) -> Array[Int32] {
+  visit : (Int32) -> Bool,
+) -> Bool {
   if !post.reachable[controller] || !post.reachable[successor] {
-    return []
+    return true
   }
   // Start at the parent so a self-edge can retain its self-control witness.
   let stop = post.immediate[controller]
   let mut ancestor = stop
   while ancestor is Some(node) {
     if node == successor {
-      return []
+      return true
     }
     ancestor = post.immediate[node]
   }
-  let dependents = []
   let mut cursor : Int32? = Some(successor)
   while cursor != stop {
     match cursor {
       Some(dependent) => {
-        if dependent < node_count {
-          dependents.push(dependent)
+        if dependent < node_count && !visit(dependent) {
+          return false
         }
         cursor = post.immediate[dependent]
       }
       None => break
     }
   }
+  true
+}
+
+///|
+fn witness_dependents(
+  post : DominatorTree,
+  controller : Int32,
+  successor : Int32,
+  node_count : Int32,
+) -> Array[Int32] {
+  let dependents = []
+  ignore(
+    visit_witness_dependents(post, controller, successor, node_count, node => {
+      dependents.push(node)
+      true
+    }),
+  )
   dependents.sort()
   dependents
+}
+
+///|
+fn sorted_witness_edges(graph : Graph) -> Array[(Int32, Int32)] {
+  let edges = graph.edges.copy()
+  edges.sort_by(fn(left, right) {
+    if left.0 != right.0 {
+      left.0.compare(right.0)
+    } else {
+      left.1.compare(right.1)
+    }
+  })
+  edges
+}
+
+///|
+// Count before writing the header flag. Completeness is independent of edge
+// order, and the first witness past the cap is sufficient to decide it.
+fn control_witness_prefix_size(
+  graph : Graph,
+  post : DominatorTree,
+) -> (Int32, Bool) {
+  let n = graph.nodes.length()
+  let mut count = 0
+  for (controller, successor) in graph.edges {
+    let exhausted = visit_witness_dependents(post, controller, successor, n, _ => {
+      if count == max_control_witnesses {
+        false
+      } else {
+        count += 1
+        true
+      }
+    })
+    if !exhausted {
+      return (count, false)
+    }
+  }
+  (count, true)
 }
 
 ///|
@@ -62,15 +118,7 @@ fn bounded_control_witnesses(
 ) -> (Array[ControlWitness], Bool) {
   let n = graph.nodes.length()
   let witnesses : Array[ControlWitness] = []
-  let edges = graph.edges.copy()
-  edges.sort_by(fn(left, right) {
-    if left.0 != right.0 {
-      left.0.compare(right.0)
-    } else {
-      left.1.compare(right.1)
-    }
-  })
-  for (controller, successor) in edges {
+  for (controller, successor) in sorted_witness_edges(graph) {
     for dependent in witness_dependents(post, controller, successor, n) {
       if witnesses.length() == max_control_witnesses {
         return (witnesses, false)
