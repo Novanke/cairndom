@@ -583,6 +583,54 @@ Local verification passed 98 Wasm GC tests, 99 JavaScript tests, all three
 SDK examples on both backends and 448 CLI invocations. Windows skipped
 the symlink and POSIX FIFO cases due to local platform capability.
 
+In 0.8.18 a selected loop query finds candidate latches using two entry
+traversals. A reachable predecessor of the selected header is a latch if
+blocking the header makes that predecessor unreachable. The shared loop
+collector walks backward from confirmed latches through reachable nodes
+and stops at the header. Each reachable predecessor of a dominated
+member other than the header is dominated as well. Full analysis keeps
+its existing immediate-dominator tree and uses it to find latches.
+
+The independent boundary oracle checks all 1,536 three-node graph and
+entry combinations for both full and selected queries. The irreducible
+fixture now also checks that a self-loop counts as a back edge and a
+bypassable predecessor in the same component counts as an entering
+edge. The dense fixture still exercises the 65,536-edge aggregate cap
+and the complete selected result.
+
+An external comparison with 0.8.17 checked six selected reports against an
+independent path oracle. The report bytes, two diagnostics, new-file output
+and refusal to overwrite an existing file matched. Full JSON and summaries
+also matched on the dense loop, irreducible self-loop and entry-loop fixtures.
+
+The timed graphs have 512 nodes. The dense forward graph adds edges in
+increasing distance and source order up to 8,192 edges. The dense loop
+graph follows a chain from node 0 to 510, adds edges 509 to 64, 511 to
+511 and 511 to 64, then adds backward edges between nodes 64 and 509 in
+increasing distance and source order up to 8,192 edges. The selected
+loop at node 64 has one entering edge, one leaving edge and 19 back edges.
+
+Windows and Node.js 22.16.0 ran seven alternating fresh process pairs
+against the optimized JavaScript of each version. The CLI time includes
+startup, input and output. Each SDK process parsed once, warmed up with
+25 calls and timed 30 to 160 queries depending on the fixture. The SDK
+results are median per-call times including graph validation.
+
+| Selected node | CLI time 0.8.17 to 0.8.18 | SDK time per call 0.8.17 to 0.8.18 |
+| --- | ---: | ---: |
+| Chain node 256 | 126.26 to 125.31 ms | 0.122 to 0.101 ms |
+| Dense forward graph node 256 | 150.75 to 145.44 ms | 0.980 to 0.858 ms |
+| Dense loop header 64 | 158.05 to 155.39 ms | 2.011 to 1.738 ms |
+| Dense loop graph unreachable node 511 | 154.24 to 149.55 ms | 1.077 to 0.992 ms |
+
+For header 64 the median process peak working set was 46.64 to 46.72 MiB
+in the CLI measurement and 65.44 to 74.72 MiB in the repeated SDK
+measurement. These peaks include Node.js runtime allocations and vary
+by fixture and process history.
+Local verification passed 98 Wasm GC tests, 99 JavaScript tests, all three
+SDK examples on both backends and 448 CLI invocations. Windows skipped
+the symlink and POSIX FIFO cases due to local platform capability.
+
 Next useful work follows correctness evidence and real consumers. Candidate
 directions include safe stage ownership/cleanup and explicit data-dependence inputs for program
 slicing. General source-language/IR parsing,

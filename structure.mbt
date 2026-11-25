@@ -90,30 +90,26 @@ fn collect_natural_loop(
   header : Int32,
   latches : Array[Int32],
   pred : Array[Array[Int32]],
-  forward : DominatorTree,
+  reachable : Array[Bool],
 ) -> (NaturalLoop, Array[Bool]) {
   let n = pred.length()
   latches.sort()
   let included = Array::make(n, false)
-  let considered = Array::make(n, false)
   let stack : Array[Int32] = []
+  // Each latch is dominated by the header. A reachable predecessor of a
+  // dominated node other than the header is also dominated: a path avoiding
+  // the header could otherwise extend to that node. The header stops the walk.
   included[header] = true
-  considered[header] = true
   for latch in latches {
     if !included[latch] {
       included[latch] = true
-      considered[latch] = true
       stack.push(latch)
     }
   }
   while !stack.is_empty() {
     let node = stack.pop().unwrap()
     for previous in pred[node] {
-      if considered[previous] || !forward.reachable[previous] {
-        continue
-      }
-      considered[previous] = true
-      if forward.dominates(header, previous) {
+      if !included[previous] && reachable[previous] {
         included[previous] = true
         stack.push(previous)
       }
@@ -150,7 +146,10 @@ fn natural_loops(
       continue
     }
     let (natural_loop, included) = collect_natural_loop(
-      header, latches, pred, forward,
+      header,
+      latches,
+      pred,
+      forward.reachable,
     )
     loops.push(natural_loop)
     if nest {

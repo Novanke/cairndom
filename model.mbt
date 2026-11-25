@@ -74,6 +74,32 @@ fn adjacency(graph : Graph) -> (Array[Array[Int32]], Array[Array[Int32]]) {
 }
 
 ///|
+fn reachable_from(
+  successors : Array[Array[Int32]],
+  root : Int32,
+  blocked~ : Int32 = -1,
+) -> Array[Bool] {
+  let reachable = Array::make(successors.length(), false)
+  if root == blocked {
+    return reachable
+  }
+  let work = [root]
+  reachable[root] = true
+  let mut cursor = 0
+  while cursor < work.length() {
+    let node = work[cursor]
+    cursor += 1
+    for next in successors[node] {
+      if next != blocked && !reachable[next] {
+        reachable[next] = true
+        work.push(next)
+      }
+    }
+  }
+  reachable
+}
+
+///|
 fn valid_id(id : String) -> Bool {
   if id.length() < 1 || id.length() > 64 {
     return false

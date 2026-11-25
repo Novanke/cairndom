@@ -110,7 +110,7 @@ CLI 和分析快照导出完整 JSON 时，会先计数确定完整性，再按�
 
 SDK 的 `loop_boundaries(graph)` 为每个自然循环列出进入边、离开边和返回循环头的回边，按端点索引排序，排除不可达前驱。嵌套循环分别计算边界；包含图入口的循环不会凭空添加进入边。没有离开边仅表示图结构，不构成终止性证明。展开总量限制为 65,536 个边记录，超限会报错，避免返回不完整边界。独立查询只计算入口可达性、直接支配关系和自然循环成员及回边。
 
-只查一个循环时，SDK 可用 `loop_boundary_at(graph, header_index)`。它只展开指定循环，边的内容和排序与全量对应项一致。即使全量超过 65,536 条边记录，单个循环仍可完整返回。合法但不可达的节点或普通节点返回 `None`，越界索引、无效图会报错。
+只查一个循环时，SDK 可用 `loop_boundary_at(graph, header_index)`。它比较正常的入口可达范围和绕开指定循环头后的可达范围，再展开该循环。边的内容和排序与全量对应项一致，即使全量超过 65,536 条边记录，单个循环仍可完整返回。合法但不可达的节点或普通节点返回 `None`，越界索引、无效图会报错。
 
 文件 CLI 使用节点 ID 指定循环头。示例里的 `head` 会返回进边 `join → head`、离开边 `head → exit` 和回边 `body → head`。
 
@@ -123,7 +123,7 @@ node _build/js/release/build/cmd/main/main.js loop-boundary examples/branch-loop
 ## SDK
 
 ```sh
-moon add Novanke/cairndom@0.8.17
+moon add Novanke/cairndom@0.8.18
 ```
 
 在调用方 `moon.pkg` 中导入 `"Novanke/cairndom" @dom`。可直接构建 `Graph`，或调用 `parse_graph`。核心入口为 `analyze`，也可单独调用 `dominators` 或 `postdominators`。图边使用节点数组索引。只需要自然循环边界或控制依赖证据时，可以直接调用相应查询，结果沿用完整分析的图校验和排序规则。

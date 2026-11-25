@@ -188,6 +188,22 @@ test "irreducible cycles without natural loops have no invented loop boundaries"
   }
   assert_eq(loop_boundaries(graph), [])
   assert_eq(loop_boundaries(graph), boundary_definition(graph))
+  for header in 1..<=3 {
+    assert_eq(loop_boundary_at(graph, header), None)
+  }
+  graph.edges.push((1, 1))
+  let boundaries = boundary_definition(graph)
+  assert_eq(boundaries, [
+    {
+      header: 1,
+      entering_edges: [(0, 1), (3, 1)],
+      leaving_edges: [(1, 3)],
+      back_edges: [(1, 1)],
+    },
+  ])
+  assert_eq(loop_boundary_at(graph, 1), Some(boundaries[0]))
+  assert_eq(loop_boundaries(graph), boundaries)
+  assert_eq(boundaries_from_full_analysis(analyze(graph)), boundaries)
 }
 
 ///|

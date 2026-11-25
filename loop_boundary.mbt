@@ -125,6 +125,7 @@ pub fn loop_boundaries(graph : Graph) -> Array[LoopBoundary] raise GraphError {
 /// unreachable node or a node without natural-loop back edges. Invalid graphs
 /// and out-of-range indices raise GraphError. Edge order and ownership match
 /// loop_boundaries. The aggregate limit does not restrict a single loop.
+/// The query uses reachability with and without the selected header.
 pub fn loop_boundary_at(
   graph : Graph,
   header : Int32,
@@ -134,17 +135,26 @@ pub fn loop_boundary_at(
     raise Invalid("loop header index is outside the graph")
   }
   let (succ, pred) = adjacency(graph)
-  let forward = compute_dominator_tree(succ, pred, graph.entry)
-  let latches = pred[header].filter(latch => forward.dominates(header, latch))
+  if pred[header].is_empty() {
+    return None
+  }
+  let reachable = reachable_from(succ, graph.entry)
+  if !reachable[header] {
+    return None
+  }
+  let avoiding_header = reachable_from(succ, graph.entry, blocked=header)
+  let latches = pred[header].filter(latch => {
+    reachable[latch] && !avoiding_header[latch]
+  })
   if latches.is_empty() {
     return None
   }
-  let (natural_loop, _) = collect_natural_loop(header, latches, pred, forward)
+  let (natural_loop, _) = collect_natural_loop(header, latches, pred, reachable)
   let edges = sorted_boundary_edges(graph)
   // For one loop the three edge classes are disjoint.
   let (boundary, _) = loop_boundary_of(
     edges,
-    forward.reachable,
+    reachable,
     natural_loop,
     edges.length(),
   )

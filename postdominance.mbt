@@ -37,21 +37,7 @@ fn entry_reachability(graph : Graph) -> Array[Bool] {
   for (from, to) in graph.edges {
     succ[from].push(to)
   }
-  let reachable = Array::make(n, false)
-  let work = [graph.entry]
-  reachable[graph.entry] = true
-  let mut cursor = 0
-  while cursor < work.length() {
-    let node = work[cursor]
-    cursor += 1
-    for next in succ[node] {
-      if !reachable[next] {
-        reachable[next] = true
-        work.push(next)
-      }
-    }
-  }
-  reachable
+  reachable_from(succ, graph.entry)
 }
 
 ///|
