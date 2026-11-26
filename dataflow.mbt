@@ -54,6 +54,9 @@ fn validate_program_rows(program : FlowProgram) -> Unit raise GraphError {
     raise Invalid("definitions and uses must each have one row per graph node")
   }
   let mut associations = 0
+  // One stamp per row, including a fresh one when switching from definitions to uses.
+  let last_seen_row = Array::make(variable_count, 0)
+  let mut row_number = 0
   for rows in [program.definitions, program.uses] {
     for row in rows {
       if row.length() > max_program_associations - associations {
@@ -62,17 +65,17 @@ fn validate_program_rows(program : FlowProgram) -> Unit raise GraphError {
         )
       }
       associations += row.length()
-      let seen = Array::make(variable_count, false)
+      row_number += 1
       for variable in row {
         if variable < 0 || variable >= variable_count {
           raise Invalid(
             "definition or use variable index is outside the program",
           )
         }
-        if seen[variable] {
+        if last_seen_row[variable] == row_number {
           raise Invalid("duplicate variable in a definition or use row")
         }
-        seen[variable] = true
+        last_seen_row[variable] = row_number
       }
     }
   }

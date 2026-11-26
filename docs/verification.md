@@ -664,6 +664,32 @@ Local verification passed 98 Wasm GC tests, 99 JavaScript tests, all
 three SDK examples on both backends and 448 CLI invocations. The
 Windows host skipped symlink and POSIX FIFO cases due to platform capability.
 
+In 0.8.20 program validation uses one variable-indexed table for all rows of
+one call. Each definition and use row receives a distinct stamp. Repeated
+variables in different rows are valid, and the first row-local error retains
+its original diagnostic. Each call validates the current mutable program.
+Regression tests cover conflicting duplicate/index errors and the first row
+above the 16,384-association limit.
+
+Nine alternating pairs of fresh Node.js 22.16.0 processes on Windows compared
+the optimized JS public SDK with 0.8.19. Each parsed one 512-node chain with
+512 variables, warmed up with 60 queries and timed 240 calls to `trace_use`,
+alternating nodes 255 and 511 for variable 511. Every call checked the source
+block and incoming-value flag. The sparse chain has four facts, the dense
+chain has 16 definitions and 16 uses per block. Peak working set covers the
+whole process, including parsing and warmup.
+
+| Fixture | Median time per query, 0.8.19 to 0.8.20 | Median peak working set |
+| --- | ---: | ---: |
+| Sparse | 0.4566 to 0.1443 ms | 46.50 to 44.97 MiB |
+| Dense | 0.5472 to 0.1911 ms | 49.23 to 49.40 MiB |
+
+Dense-fixture peak ranges overlapped. The measured gain on that fixture was
+in query time. CLI checks compared stdout, stderr and exit codes with the
+prior release. Local verification passed 98 Wasm GC tests, 99 JavaScript
+tests, three SDK examples on both backends and 448 real CLI invocations.
+Windows skipped symlink and POSIX FIFO cases due to host capability.
+
 Next useful work follows correctness evidence and real consumers. Candidate
 directions include safe stage ownership/cleanup and explicit data-dependence inputs for program
 slicing. General source-language/IR parsing,

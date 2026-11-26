@@ -123,7 +123,7 @@ node _build/js/release/build/cmd/main/main.js loop-boundary examples/branch-loop
 ## SDK
 
 ```sh
-moon add Novanke/cairndom@0.8.19
+moon add Novanke/cairndom@0.8.20
 ```
 
 在调用方 `moon.pkg` 中导入 `"Novanke/cairndom" @dom`。可直接构建 `Graph`，或调用 `parse_graph`。核心入口为 `analyze`，也可单独调用 `dominators` 或 `postdominators`。图边使用节点数组索引。只需要自然循环边界或控制依赖证据时，可以直接调用相应查询，结果沿用完整分析的图校验和排序规则。
@@ -188,6 +188,8 @@ let shared_region = post.nearest_common([left_index, right_index])
 `FlowProgram` 为每个块提供变量定义和使用集合，`liveness(program)` 返回按变量索引排序的 `live_in` / `live_out`。这里的 `uses` 表示块内该变量首次定义之前的使用，同一变量可同时出现在使用和定义中。活跃性覆盖全部入口可达路径，包括永久循环；不可达块的结果为空，声明出口不会裁掉这些数据流路径。
 
 最多允许 512 个变量和 16,384 个定义/使用关联。变量 ID 与节点 ID 使用相同语法；定义、使用的行数必须等于图节点数，每行的变量索引需合法且不重复。返回集合独立持有数组，编辑输入不会改变已有结果。
+
+对同一个可修改的程序反复调用 `trace_use` 时，每次都会检查当前的定义和使用。校验在一次调用内复用一张按变量索引的标记表，空块较多时也只初始化一次。一个变量可以跨块出现，也可以在同一块中先使用再定义。
 
 程序事实的文件格式为 `cairndom.program.v1`，通过 `parse_program` / `program_json_text` 导入导出：
 

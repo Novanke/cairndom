@@ -118,8 +118,6 @@ test "typed program validation rejects invalid identifiers rows indices and grap
       { ..program, definitions: [[1]], },
       { ..program, uses: [[-1]], },
       { ..program, uses: [[1]], },
-      { ..program, definitions: [[0, 0]], },
-      { ..program, uses: [[0, 0]], },
       { ..program, graph: { ..program.graph, entry: 1, }, },
     ] {
     let rejected = try {
@@ -141,6 +139,23 @@ test "typed program validation rejects invalid identifiers rows indices and grap
     Invalid(message) => message
   }
   assert_eq(first_error, "entry index is outside the graph")
+  let duplicate = "duplicate variable in a definition or use row"
+  let outside = "definition or use variable index is outside the program"
+  for
+    (definitions, uses, expected) in [
+      ([[0, 0]], [[-1]], duplicate),
+      ([[-1]], [[0, 0]], outside),
+      ([[0]], [[0, 0, -1]], duplicate),
+      ([[0]], [[0, -1, 0]], outside),
+    ] {
+    let message = try {
+      validate_program({ ..program, definitions, uses, })
+      "accepted"
+    } catch {
+      Invalid(message) => message
+    }
+    assert_eq(message, expected)
+  }
 }
 
 ///|
@@ -161,14 +176,17 @@ test "program association and variable limits accept the exact boundary" {
   assert_eq(result.live_in[0], [])
   assert_eq(result.live_out[0], [])
   assert_eq(result.reachable[511], false)
-  program.uses[0].push(0)
-  let rejected = try {
+  // Check row capacity before inspecting even the first out-of-range index.
+  program.uses[0].push(512)
+  let message = try {
     ignore(liveness(program))
-    false
+    "accepted"
   } catch {
-    Invalid(_) => true
+    Invalid(message) => message
   }
-  assert_true(rejected)
+  assert_eq(
+    message, "program limit is at most 16384 definition/use associations",
+  )
 }
 
 ///|

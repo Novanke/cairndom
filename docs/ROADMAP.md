@@ -74,15 +74,21 @@
   serialize it one edge at a time under the existing byte budget.
 - Serialize saved value-origin reports one use at a time under the existing
   byte budget.
+- Validate all definition and use rows with one per-call variable stamp table
+  while preserving the first diagnostic and observing caller edits on each query.
 
 ## Next candidates
 
 Prioritize observed correctness problems and reproducible consumers.
 
-1. **Stage recovery.** Define a separate policy for reviewing retained reports.
+1. **Control witnesses on unreachable edges.** Measure a selected edge in a
+   disconnected component of a large graph and check whether entry reachability
+   can resolve the query before building the postdominator tree. Compare answers
+   and diagnostics with the current implementation.
+2. **Stage recovery.** Define a separate policy for reviewing retained reports.
    Inspection reports observations from a trusted local directory, and task
    termination alone does not establish whether publication completed.
-2. **Program slicing.** Define explicit data-dependence inputs before exposing
+3. **Program slicing.** Define explicit data-dependence inputs before exposing
    a slicing API. Document which relationships clients must supply.
 
 The existing mutable Analysis API requires valid, unmodified results to
