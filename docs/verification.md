@@ -690,6 +690,54 @@ prior release. Local verification passed 98 Wasm GC tests, 99 JavaScript
 tests, three SDK examples on both backends and 448 real CLI invocations.
 Windows skipped symlink and POSIX FIFO cases due to host capability.
 
+In 0.8.21 the selected-edge query validates the graph, controller index,
+successor index and directed edge in that order. It then returns an empty
+witness array if the controller is unreachable from the entry. An existing
+edge from a reachable controller makes its successor reachable, so only one
+endpoint needs testing. Reachable controllers reuse the same entry traversal
+when building the finite-exit postdominator tree.
+
+A temporary counter at the tree constructor compared 0.8.20 with this
+version. Both an unreachable-to-unreachable edge and an unreachable-to-reachable
+edge went from one construction to zero. A reachable diamond edge still
+built one tree and returned the same dependent. A missing edge failed before
+tree construction on both versions. Regression tests also modify the graph
+between two calls and check that a previously unreachable edge gains its
+witness. Fifteen CLI scenarios matched 0.8.20 for exit code, stdout, stderr
+and output-file contents, including competing errors and overwrite refusal.
+
+The benchmark uses 512 nodes, entry `b0`, exit `b509` and 8,192 edges. Seed
+the graph with `0→1, 0→2, 1→3, 2→3, 510→511, 510→1, 511→510`. Fill the rest
+with forward edges among nodes 3 through 509, in increasing distance and
+then source order. Nodes 510 and 511 are unreachable even though 510 has an
+edge into the reachable diamond. The selected edges are 510→511, 510→1 and
+0→1. The first two have no dependents and the third has exactly one, node 1.
+
+The following medians compare 0.8.20 to 0.8.21 on Windows with Node.js
+22.16.0. Nine alternating fresh-process pairs ran per row and measurement
+mode. Each SDK process parsed the graph once, warmed up with 20 calls, then
+timed 80 calls with result checks. CLI wall time includes startup, graph
+parsing and output. Both peak working set measurements cover the entire process.
+
+| Selected edge | SDK ms/query | SDK peak MiB | CLI ms/run | CLI peak MiB |
+| --- | ---: | ---: | ---: | ---: |
+| Unreachable → unreachable | 1.2664 to 0.8946 | 77.02 to 77.05 | 169.05 to 164.00 | 49.59 to 49.58 |
+| Unreachable → reachable | 1.2469 to 0.8791 | 77.23 to 77.19 | 167.23 to 162.89 | 49.72 to 49.71 |
+| Reachable diamond branch | 1.2833 to 1.2738 | 76.85 to 78.32 | 168.73 to 178.92 | 49.65 to 49.59 |
+
+The unreachable SDK queries used about 29% less time. Peak working set
+ranges overlapped in every comparison. Reachable CLI medians were 6.0%
+slower in this run, with overlapping ranges of 164.50–181.27 and
+167.75–195.30 ms. A separate 16-pair reachable CLI check balanced which
+version ran first with seed 20261126. The median went from 170.75 to
+176.79 ms (+3.54%), with a median paired difference of +2.46 ms and the
+candidate slower in 11 pairs. All 32 outputs matched. These measurements
+show a cost for the reachable CLI case on this host.
+
+Local verification passed 98 Wasm GC tests, 99 JS
+tests, three SDK examples on both backends and 448 real CLI invocations.
+Windows skipped symlink and POSIX FIFO cases due to host capability.
+
 Next useful work follows correctness evidence and real consumers. Candidate
 directions include safe stage ownership/cleanup and explicit data-dependence inputs for program
 slicing. General source-language/IR parsing,

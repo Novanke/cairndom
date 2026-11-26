@@ -184,6 +184,12 @@ test "declared exits exclude permanent cycles and unreachable inducing edges" {
   }
   assert_eq(control_dependence_witnesses(one_finite_path), [])
   check_witness_definition(one_finite_path)
+  // The same original edge gains a witness when the caller connects its controller.
+  assert_eq(control_dependence_witnesses_at(graph, 0, 2), [])
+  graph.edges.push((1, 0))
+  assert_eq(witness_triples(control_dependence_witnesses_at(graph, 0, 2)), [
+    (0, 2, 2),
+  ])
 }
 
 ///|
@@ -220,20 +226,23 @@ test "witness API preserves graph validation diagnostics" {
 ///|
 test "selected control witness requires both valid endpoints and an original directed edge" {
   let graph : Graph = {
-    nodes: ["entry", "next"],
-    edges: [(0, 1)],
+    nodes: ["entry", "exit", "dead"],
+    edges: [(0, 1), (2, 1)],
     entry: 0,
-    exits: [],
+    exits: [1],
   }
   assert_eq(control_dependence_witnesses_at(graph, 0, 1), [])
+  let duplicate = { ..graph, edges: [(0, 1), (2, 1), (0, 1)], }
   for
-    (controller, successor, expected) in [
-      (-1, 1, "control witness controller index is outside the graph"),
-      (0, 2, "control witness successor index is outside the graph"),
-      (1, 0, "control witness edge does not exist"),
+    (input, controller, successor, expected) in [
+      (duplicate, 2, 1, "duplicate edge"),
+      (graph, -1, 3, "control witness controller index is outside the graph"),
+      (graph, 2, 3, "control witness successor index is outside the graph"),
+      (graph, 1, 0, "control witness edge does not exist"),
+      (graph, 2, 0, "control witness edge does not exist"),
     ] {
     let error = try {
-      ignore(control_dependence_witnesses_at(graph, controller, successor))
+      ignore(control_dependence_witnesses_at(input, controller, successor))
       ""
     } catch {
       Invalid(message) => message

@@ -102,6 +102,8 @@ CLI 和分析快照导出完整 JSON 时，会先计数确定完整性，再按�
 
 只查一条原始有向边时，可用 `control_dependence_witnesses_at(graph, controller_index, successor_index)` 或上面的 `control-witness` 命令。即使全量证据被截断或超过输出预算，单条边仍可返回完整结果。CLI 的 `cairndom.control-witness.v1` 报告包含两端节点 ID 和按节点索引排序的 `dependents`，示例中 `choose → left` 的结果为 `["left"]`。合法边没有有限出口范围内的证据时返回空数组。未知 ID、越界索引或不存在的有向边会报错。以 `--` 开头的 ID 可用 `--controller=NODE_ID` 或 `--successor=NODE_ID` 传入。命令支持 `--out` 和可选的 `--durable`。
 
+对一条已确认存在的边，如果从入口到不了它的起点，单边查询会直接返回空证据，即使终点可达也一样。此时无需构建后支配树。查询仍按原顺序校验整张图、两端节点和边是否存在。
+
 如果只需要节点级分析，使用 `analyze --format json-summary` 或快照的 `summary_json_text()`。摘要使用独立格式 `cairndom.analysis-summary.v1`，保留可达性、支配关系、控制依赖、自然循环和强连通分量，跳过边级证据的计算与输出。密集图的完整报告若因边级证据过大而无法导出，摘要仍可能适用。两种 JSON 输出都受各自入口的 16 MiB 上限约束。
 
 摘要按记录生成，在追加每段文本前核对剩余字节。SDK 可用 `saved.summary_json_text_limit(bytes)` 将正文预算设为 0 到 16 MiB，刚好达到预算时仍可导出。CLI 把末尾换行计入 16 MiB，仅在整份报告符合预算后才写入标准输出或新文件。
@@ -123,7 +125,7 @@ node _build/js/release/build/cmd/main/main.js loop-boundary examples/branch-loop
 ## SDK
 
 ```sh
-moon add Novanke/cairndom@0.8.20
+moon add Novanke/cairndom@0.8.21
 ```
 
 在调用方 `moon.pkg` 中导入 `"Novanke/cairndom" @dom`。可直接构建 `Graph`，或调用 `parse_graph`。核心入口为 `analyze`，也可单独调用 `dominators` 或 `postdominators`。图边使用节点数组索引。只需要自然循环边界或控制依赖证据时，可以直接调用相应查询，结果沿用完整分析的图校验和排序规则。

@@ -138,8 +138,7 @@ fn bounded_control_witnesses_of(
 }
 
 ///|
-fn witness_post_tree(graph : Graph) -> DominatorTree? {
-  let reachable = entry_reachability(graph)
+fn witness_post_tree(graph : Graph, reachable : Array[Bool]) -> DominatorTree? {
   if !graph.exits.any(exit => reachable[exit]) {
     return None
   }
@@ -158,7 +157,9 @@ pub fn control_dependence_witnesses(
   graph : Graph,
 ) -> Array[ControlWitness] raise GraphError {
   validate_graph(graph)
-  guard witness_post_tree(graph) is Some(post) else { return [] }
+  guard witness_post_tree(graph, entry_reachability(graph)) is Some(post) else {
+    return []
+  }
   let (witnesses, complete) = bounded_control_witnesses(graph, post)
   if !complete {
     raise Invalid("control-dependence witness limit of 65536 exceeded")
@@ -187,7 +188,12 @@ pub fn control_dependence_witnesses_at(
   if !graph.edges.contains((controller, successor)) {
     raise Invalid("control witness edge does not exist")
   }
-  guard witness_post_tree(graph) is Some(post) else { return [] }
+  let reachable = entry_reachability(graph)
+  // Every path through this edge must first reach its controller.
+  if !reachable[controller] {
+    return []
+  }
+  guard witness_post_tree(graph, reachable) is Some(post) else { return [] }
   witness_dependents(post, controller, successor, n).map(dependent => {
     controller,
     successor,
