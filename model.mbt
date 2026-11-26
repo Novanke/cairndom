@@ -140,25 +140,33 @@ fn validate_graph(graph : Graph) -> Unit raise GraphError {
 // The caller has already checked node IDs, limits and the entry reference.
 fn validate_graph_connections(graph : Graph) -> Unit raise GraphError {
   let n = graph.nodes.length()
-  let pairs : Map[(Int32, Int32), Bool] = Map([])
+  // Allocate a destination bitmap only for nodes that have outgoing edges.
+  let outgoing : Array[Array[Int32]] = Array::make(n, [])
+  let words_per_node = (n + 31) / 32
   for (from, to) in graph.edges {
     if from < 0 || from >= n || to < 0 || to >= n {
       raise Invalid("edge index is outside the graph")
     }
-    if pairs.contains((from, to)) {
+    if outgoing[from].is_empty() {
+      outgoing[from] = Array::make(words_per_node, 0)
+    }
+    let row = outgoing[from]
+    let word = to / 32
+    let bit = 1 << (to % 32)
+    if (row[word] & bit) != 0 {
       raise Invalid("duplicate edge")
     }
-    pairs[(from, to)] = true
+    row[word] = row[word] | bit
   }
-  let exits : Map[Int32, Bool] = Map([])
+  let seen_exit = Array::make(n, false)
   for exit in graph.exits {
-    if exit < 0 || exit >= n || exits.contains(exit) {
+    if exit < 0 || exit >= n || seen_exit[exit] {
       raise Invalid("invalid or duplicate exit")
     }
-    exits[exit] = true
+    seen_exit[exit] = true
   }
-  for (from, _) in graph.edges {
-    if exits.contains(from) {
+  for exit in graph.exits {
+    if !outgoing[exit].is_empty() {
       raise Invalid("declared exits must have no outgoing edges")
     }
   }

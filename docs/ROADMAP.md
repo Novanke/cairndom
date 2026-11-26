@@ -78,6 +78,8 @@
   while preserving the first diagnostic and observing caller edits on each query.
 - Return empty witnesses for an existing edge whose controller is unreachable
   from the entry before constructing the reverse exit graph and postdominator tree.
+- Check directed-edge uniqueness using destination bits grouped by source
+  during graph import and each validation of a mutable SDK graph.
 
 ## Next candidates
 

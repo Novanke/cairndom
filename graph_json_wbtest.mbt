@@ -58,6 +58,9 @@ test "graph export rejects bad typed indices before serializing" {
         "invalid or duplicate node ID: same",
       ),
       ({ ..graph, exits: [0], }, "declared exits must have no outgoing edges"),
+      ({ ..graph, exits: [0, 0], }, "invalid or duplicate exit"),
+      ({ ..graph, exits: [0, 2], }, "invalid or duplicate exit"),
+      ({ ..graph, edges: [(1, 0), (0, 1), (1, 0), (0, 2)], }, "duplicate edge"),
     ] {
     let error = try {
       ignore(graph_json_text(bad))
@@ -66,6 +69,29 @@ test "graph export rejects bad typed indices before serializing" {
       Invalid(message) => message
     }
     assert_eq(error, detail)
+  }
+}
+
+///|
+test "directed edge validation separates sources and destination words" {
+  let graph : Graph = {
+    nodes: Array::makei(512, i => "n" + i.to_string()),
+    entry: 0,
+    exits: [63],
+    edges: [(0, 31), (0, 32), (0, 63), (0, 511), (511, 31), (511, 511)],
+  }
+  assert_eq(parse_graph(graph_json_text(graph)).edges, graph.edges)
+  let last = graph.edges.length()
+  graph.edges.push((0, 0))
+  for target in [31, 32, 63, 511] {
+    graph.edges[last] = (0, target)
+    let error = try {
+      ignore(graph_json_text(graph))
+      ""
+    } catch {
+      Invalid(message) => message
+    }
+    assert_eq(error, "duplicate edge")
   }
 }
 

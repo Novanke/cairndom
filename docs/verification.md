@@ -738,6 +738,45 @@ Local verification passed 98 Wasm GC tests, 99 JS
 tests, three SDK examples on both backends and 448 real CLI invocations.
 Windows skipped symlink and POSIX FIFO cases due to host capability.
 
+In 0.8.22 graph validation records the destination bits of each source with
+outgoing edges. A destination index selects a 32-bit word and a bit within
+it. Edge indices and duplicates are still checked in input order. All exit
+indices and duplicate exits are checked before testing whether any declared
+exit has an outgoing edge. Fresh per-call state observes subsequent SDK
+edits. Regressions cover different sources with the same destination, bits
+31, 32, 63 and 511, a self-loop and competing diagnostics.
+
+A timed probe in a separate copy of the optimized JS CLI found two calls to
+connection validation per reachable-edge command: during parsing and during
+the public query. On the 512-node, 8,192-edge fixture described above, the
+median combined time in these calls was 9.03 ms for 0.8.21 and 2.85 ms for
+0.8.22 across nine fresh Windows processes per version. This instrumented
+measurement includes wrapper overhead. Other stages also contribute to the
+CLI wall time, including strict JSON parsing and process startup.
+
+The release comparison used uninstrumented CLI bundles. It interleaved
+16 pairs of fresh Node.js 22.16.0 processes per scenario on Windows, with
+each version running first in eight pairs. SDK processes parsed once,
+warmed up with 20 calls and timed 80 calls. The sparse fixture uses 512 nodes
+and 510 edges. Peak working set covers the entire process. Times below are
+medians from the same run of both versions.
+
+| Workload | Time in ms, 0.8.21 to 0.8.22 | Peak MiB, 0.8.21 to 0.8.22 |
+| --- | ---: | ---: |
+| Dense graph, reachable CLI query | 89.28 to 80.75 | 49.58 to 46.73 |
+| Dense graph, unreachable CLI query | 82.99 to 75.37 | 49.63 to 45.77 |
+| Dense graph, reachable SDK query | 1.2212 to 0.5832 | 77.01 to 55.95 |
+| Dense graph, unreachable SDK query | 0.8659 to 0.2188 | 77.11 to 48.33 |
+| Dense graph, typed graph validation | 0.7363 to 0.1306 | 56.67 to 47.83 |
+| Sparse graph, typed graph validation | 0.1132 to 0.0923 | 42.09 to 41.37 |
+| Sparse graph, reachable CLI query | 64.04 to 60.81 | 39.53 to 39.30 |
+
+The dense reachable CLI query was faster in all 16 pairs. Fifteen CLI
+scenarios matched 0.8.21 for exit code, stdout, stderr and output-file
+behavior. Local checks passed 99 Wasm GC and 100 JavaScript tests, all three
+SDK examples on both backends and 448 CLI invocations. The Windows host
+skipped symlink and POSIX FIFO cases.
+
 Next useful work follows correctness evidence and real consumers. Candidate
 directions include safe stage ownership/cleanup and explicit data-dependence inputs for program
 slicing. General source-language/IR parsing,
