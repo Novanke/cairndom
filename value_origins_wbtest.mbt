@@ -447,6 +447,7 @@ test "value origins accept exactly 65536 source relations and reject the next in
     }
   }
   assert_eq(relations, 65536)
+  assert_true(exact.json_text().contains("\"source_relation_count\": 65536"))
   program.uses[256].push(1)
   let error = try {
     ignore(trace_values(program))

@@ -43,50 +43,103 @@ pub fn trace_use_json_text(
 }
 
 ///|
+// Reuse quoted identifiers in full reports. Emit the same fields and
+// indentation as value_origin_row, with one temporary row at a time.
+fn BoundedJsonWriter::value_origin_rows(
+  self : Self,
+  saved : ValueOrigins,
+) -> Unit raise GraphError {
+  self.field("uses")
+  self.append("[")
+  if !saved.origins.is_empty() {
+    let names = saved.program.graph.nodes.map(name => {
+      Json::string(name).stringify()
+    })
+    let variables = saved.program.variables.map(name => {
+      Json::string(name).stringify()
+    })
+    let definition_lines = names.map(name => "\n        \{name}")
+    let row = StringBuilder()
+    for index, origin in saved.origins {
+      if index > 0 {
+        self.append(",")
+      }
+      row.reset()
+      row.write_string(
+        "\n    {\n      \"node\": \{names[origin.node]},\n      \"variable\": \{variables[origin.variable]},\n      \"definition_blocks\": [",
+      )
+      for position, definition in origin.definitions {
+        if position > 0 {
+          row.write_string(",")
+        }
+        row.write_string(definition_lines[definition])
+      }
+      if !origin.definitions.is_empty() {
+        row.write_string("\n      ")
+      }
+      let incoming = if origin.requires_entry_value { "true" } else { "false" }
+      row.write_string("],\n      \"requires_entry_value\": \{incoming}\n    }")
+      self.append(row.to_string()[:])
+    }
+    self.append("\n  ")
+  }
+  self.append("]")
+}
+
+///|
 /// Serialize the saved, complete result using original block/variable IDs.
 /// Inspection-copy edits cannot change this report. Output is limited to 16 MiB.
 pub fn ValueOrigins::json_text(self : Self) -> String raise GraphError {
   let program = self.program
   let graph = program.graph
+  let out : BoundedJsonWriter = {
+    buffer: StringBuilder(),
+    remaining: max_report_json_bytes,
+    overflow_detail: "value-origin JSON exceeds 16 MiB",
+  }
   let unreachable_nodes = []
   for node, yes in self.reachable {
     if !yes {
       unreachable_nodes.push(node)
     }
   }
-  let mut relations = 0
-  let uses = self.origins.map(origin => {
-    relations += origin.definitions.length()
-    if origin.requires_entry_value {
-      relations += 1
-    }
-    value_origin_row(program, origin)
-  })
-  let output = Json::object(
-    Map([
-      ("schema", Json::string("cairndom.value-origins.v1")),
-      ("entry", Json::string(graph.nodes[graph.entry])),
-      ("scope", Json::string("entry_reachable_all_paths")),
-      ("use_convention", Json::string("before_local_definition")),
-      ("status", Json::string("possible_origins")),
-      ("variables", Json::array(program.variables.map(Json::string))),
-      ("unreachable_blocks", names_json(graph, unreachable_nodes)),
-      ("uses", Json::array(uses)),
-      ("source_relation_count", Json::number(relations.to_double())),
-      (
-        "source_relation_limit",
-        Json::number(max_value_origin_relations.to_double()),
-      ),
-      (
-        "incoming_value_semantics",
-        Json::string(
-          "An incoming value can reach this use; the caller must supply a parameter or initial value, or apply its own missing-initialization rules. This is not proof of an initialization error.",
-        ),
-      ),
-    ]),
-  ).stringify(indent=2)
-  if output.length() > 16_777_216 {
-    raise Invalid("value-origin JSON exceeds 16 MiB")
+  let header = [
+    ("schema", Json::string("cairndom.value-origins.v1")),
+    ("entry", Json::string(graph.nodes[graph.entry])),
+    ("scope", Json::string("entry_reachable_all_paths")),
+    ("use_convention", Json::string("before_local_definition")),
+    ("status", Json::string("possible_origins")),
+    ("variables", Json::array(program.variables.map(Json::string))),
+    ("unreachable_blocks", names_json(graph, unreachable_nodes)),
+  ]
+  out.append("{\n")
+  for (name, value) in header {
+    out.field(name)
+    out.value(value, "  ")
+    out.append(",\n")
   }
-  output
+  out.value_origin_rows(self)
+  let footer = [
+    (
+      "source_relation_count",
+      Json::number(self.source_relation_count.to_double()),
+    ),
+    (
+      "source_relation_limit",
+      Json::number(max_value_origin_relations.to_double()),
+    ),
+    (
+      "incoming_value_semantics",
+      Json::string(
+        "An incoming value can reach this use; the caller must supply a parameter or initial value, or apply its own missing-initialization rules. This is not proof of an initialization error.",
+      ),
+    ),
+  ]
+  for (name, value) in footer {
+    out.append(",\n")
+    out.field(name)
+    out.value(value, "  ")
+  }
+  out.append("\n}")
+  out.buffer.to_string()
 }

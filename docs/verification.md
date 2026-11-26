@@ -631,6 +631,39 @@ Local verification passed 98 Wasm GC tests, 99 JavaScript tests, all three
 SDK examples on both backends and 448 CLI invocations. Windows skipped
 the symlink and POSIX FIFO cases due to local platform capability.
 
+In 0.8.19 full value-origin exports serialize one use row at a time and
+reuse the JSON spelling of repeated identifiers. The saved analysis
+retains the source relation count already computed during analysis.
+The byte budget is checked during export using the existing 16 MiB
+limit. Field and row order, indentation, the CLI newline and the
+single-use report remain compatible. The exact 65,536-source fixture
+also checks the serialized count; the next source yields the existing
+relation-limit diagnostic.
+
+The benchmark compares 0.8.18 and 0.8.19 with seven alternating fresh
+Node.js 22.16.0 process pairs on Windows. Both fixtures use 64-byte
+ASCII IDs. The use-heavy fixture is a 512-node chain that reads 32
+variables at each node and contains 16,384 uses. Its report body is
+4,049,743 bytes. The relation-heavy fixture uses 511 report rows and
+the exact 65,536-source graph in `value_origins_wbtest.mbt`. Its
+report body is 5,090,017 bytes.
+
+| Fixture | CLI wall time | CLI peak working set | SDK per export |
+| --- | ---: | ---: | ---: |
+| 16,384 uses | 234.12 to 184.26 ms | 105.50 to 64.50 MiB | 40.426 to 5.610 ms |
+| 65,536 source relations | 205.14 to 176.52 ms | 77.56 to 61.17 MiB | 22.827 to 2.967 ms |
+
+The table shows medians. CLI figures include startup, input, analysis
+and output. Each SDK process analyzed once, warmed up with four exports
+and measured 12 exports of the same saved report. Its median peak
+working set was 269.67 to 107.77 MiB for the use-heavy fixture and
+194.39 to 95.05 MiB for the relation-heavy fixture. Full report bytes,
+selected uses, diagnostics, new-file output and refusal to overwrite
+matched the prior release.
+Local verification passed 98 Wasm GC tests, 99 JavaScript tests, all
+three SDK examples on both backends and 448 CLI invocations. The
+Windows host skipped symlink and POSIX FIFO cases due to platform capability.
+
 Next useful work follows correctness evidence and real consumers. Candidate
 directions include safe stage ownership/cleanup and explicit data-dependence inputs for program
 slicing. General source-language/IR parsing,

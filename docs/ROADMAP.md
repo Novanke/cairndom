@@ -72,6 +72,8 @@
   a variable has no entry-reachable definition.
 - Count the bounded control-witness prefix before full JSON export and
   serialize it one edge at a time under the existing byte budget.
+- Serialize saved value-origin reports one use at a time under the existing
+  byte budget.
 
 ## Next candidates
 

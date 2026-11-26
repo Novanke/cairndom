@@ -123,7 +123,7 @@ node _build/js/release/build/cmd/main/main.js loop-boundary examples/branch-loop
 ## SDK
 
 ```sh
-moon add Novanke/cairndom@0.8.18
+moon add Novanke/cairndom@0.8.19
 ```
 
 在调用方 `moon.pkg` 中导入 `"Novanke/cairndom" @dom`。可直接构建 `Graph`，或调用 `parse_graph`。核心入口为 `analyze`，也可单独调用 `dominators` 或 `postdominators`。图边使用节点数组索引。只需要自然循环边界或控制依赖证据时，可以直接调用相应查询，结果沿用完整分析的图校验和排序规则。
@@ -242,7 +242,7 @@ let selected = @dom.trace_use(program, 3, 0)
 
 全量分析会一次识别哪些变量在可达块中有定义。没有可达定义的变量直接记录入口值，包括定义只出现在不可达块的情况。需要反向搜索时，每个使用点使用 O(n) 临时空间，工作量为 O(n + e)，另需存储完整结果。
 
-总来源关系上限为 **65,536**，每个使用点的入口值标志也计作一条关系。超过上限整体报错。JSON 为 `cairndom.value-origins.v1`，包括 `uses`、`unreachable_blocks`、`source_relation_count` 和 `source_relation_limit`，输出仍限制为 16 MiB。CLI 沿用新文件独占发布约定，分析失败时不会留下半份目标报告。
+总来源关系上限为 **65,536**，每个使用点的入口值标志也计作一条关系。超过上限整体报错。JSON 为 `cairndom.value-origins.v1`，包括 `uses`、`unreachable_blocks`、`source_relation_count` 和 `source_relation_limit`。导出时逐条格式化使用点并检查剩余的 16 MiB 字节预算，完整报告生成后才会返回或发布。CLI 沿用新文件独占发布约定。
 
 完整示例会执行断言并输出分析与 phi 候选点。
 

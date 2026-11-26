@@ -23,6 +23,7 @@ struct ValueOrigins {
   program : FlowProgram
   reachable : Array[Bool]
   origins : Array[UseOrigins]
+  source_relation_count : Int32
 }
 
 ///|
@@ -241,7 +242,12 @@ pub fn trace_values(input : FlowProgram) -> ValueOrigins raise GraphError {
       left.variable.compare(right.variable)
     }
   })
-  { program, reachable: search.reachable, origins, }
+  {
+    program,
+    reachable: search.reachable,
+    origins,
+    source_relation_count: relations,
+  }
 }
 
 ///|
