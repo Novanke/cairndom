@@ -58,11 +58,8 @@ fn read_stage_owner(binding : String, marker : String) -> StageOwner? {
   if binding.is_empty() || marker.is_empty() {
     return None
   }
-  let value = @json.parse(
-    marker,
-    max_nesting_depth=2,
-    reject_duplicate_keys=true,
-  ) catch {
+  // The file reader caps the marker at 4 KiB. Its schema requires flat fields.
+  let value = @json.parse(marker, reject_duplicate_keys=true) catch {
     _ => return None
   }
   guard value is Object(fields) && fields.length() == 7 else { return None }

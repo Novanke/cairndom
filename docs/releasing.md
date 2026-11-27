@@ -2,11 +2,12 @@
 
 1. Read AGENTS.md, README.md and docs/verification.md. Confirm a clean worktree,
    the intended public remote, and no concurrent builds or unpublished user edits.
-2. Record `moon version --all`; use the compiler version pinned in CI or newer
-   only after verifying the supported entry points. Update the module version
-   and the README's exact dependency version together.
+2. Record `moon version --all` with the official compiler, at least 1.0.0-rc1.
+   CI installs the current official toolchain and checks this floor. Record the
+   exact local and CI versions if they differ. Update the module version and the
+   README's dependency version together.
 3. Run formatting, public-interface generation, Wasm GC and JavaScript checks
-   and tests, the optimized JavaScript build, all three SDK examples on both backends,
+   and tests, release builds on both backends, all three SDK examples on both backends,
    the five Python host entry points: `verify_cli.py`, `verify_ssa_cli.py`,
    `verify_queries.py`, `verify_stdout.py` and `verify_value_origins.py`. The full JS release build includes
    the independent MoonBit reference command used by those entry points.

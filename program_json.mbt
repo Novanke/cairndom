@@ -23,13 +23,7 @@ pub fn parse_program(input : String) -> FlowProgram raise GraphError {
   if input.length() > 2_097_152 {
     raise Invalid("program JSON exceeds 2 MiB")
   }
-  let value = @json.parse(
-    input,
-    max_nesting_depth=12,
-    reject_duplicate_keys=true,
-  ) catch {
-    _ => raise Invalid("invalid JSON, repeated key or excessive nesting")
-  }
+  let value = parse_bounded_json(input, 12)
   let object = fields(value, ["schema", "graph", "variables", "blocks"])
   if text(required(object, "schema")) != "cairndom.program.v1" {
     raise Invalid("schema must be cairndom.program.v1")

@@ -1,7 +1,7 @@
 # CairnDom technical verification
 
-The supported compiler is moonc 0.10.20 or newer. Development verification uses
-moonc 0.10.20+65efd5b93, moon 0.1.20261104 (940aa18), and Node.js 22.16.0.
+The supported compiler is moonc 1.0.0-rc1 or newer. Release 0.8.23 uses
+moonc 1.0.0-rc1+3c0520448 and moon 0.1.20261126 (ccd306a).
 Run `moon version --all` to record the actual local tools.
 
 The pure library has no runtime dependencies outside the standard library. Both
@@ -24,7 +24,7 @@ reported relationships. It also exercises output refusal, malformed inputs and
 filesystem limits. Its `--node` and `--cli` arguments allow the same checks against
 a separately installed registry consumer.
 
-Local verification on Windows with the versions above passed both backend
+Historical Windows verification with moonc 0.10.20+65efd5b93 and Node.js 22.16.0 passed both backend
 checks, all 89 test blocks on each backend, the optimized JavaScript build and
 the SDK examples on both backends. The separate graph CLI oracle passed 115 graph cases and 161
 actual process invocations, including maximum graph limits, exact input size,
@@ -776,6 +776,27 @@ scenarios matched 0.8.21 for exit code, stdout, stderr and output-file
 behavior. Local checks passed 99 Wasm GC and 100 JavaScript tests, all three
 SDK examples on both backends and 448 CLI invocations. The Windows host
 skipped symlink and POSIX FIFO cases.
+
+## 0.8.23 MoonBit 1.0 release candidate
+
+The new standard JSON parser deprecates the argument that previously imposed a
+nesting limit. A MoonBit scan now checks each input before parsing. It counts
+containers outside strings, including through escaped quotes and backslashes.
+The graph, program and query formats retain their 8/12/12 container limits and
+duplicate-key diagnostics. The stage-marker reader uses its existing size and
+flat-schema checks. The public MoonBit interfaces match 0.8.22.
+
+Windows verification with moonc 1.0.0-rc1+3c0520448 and Node.js 22.16.0 passed 100
+Wasm GC and 101 JavaScript tests, both release builds, all three SDK examples
+on both backends, and 448 real CLI invocations. Symlink creation and POSIX FIFO
+checks were unavailable on this local host. A separate comparison matched
+0.8.22 across 35 CLI scenarios for sample reports, nesting boundaries,
+duplicate keys, escaped strings, successful file output and overwrite refusal.
+
+CI installs the current official toolchain on Linux and Windows, checks the
+compiler floor, and runs both release builds, tests, examples and the file
+oracles. The module declares Wasm GC and JavaScript as supported targets. The
+file-based CLI and the reference command use JavaScript.
 
 Next useful work follows correctness evidence and real consumers. Candidate
 directions include safe stage ownership/cleanup and explicit data-dependence inputs for program

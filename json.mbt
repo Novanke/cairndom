@@ -52,6 +52,50 @@ fn node_index(
 }
 
 ///|
+fn parse_bounded_json(
+  input : String,
+  max_depth : Int32,
+) -> Json raise GraphError {
+  // The standard parser no longer treats its depth parameter as a rejection
+  // limit. Count containers before parsing and leave syntax and keys to @json.
+  let mut depth = 0
+  let mut quoted = false
+  let mut escaped = false
+  let invalid = "invalid JSON, repeated key or excessive nesting"
+  for ch in input[:] {
+    if quoted {
+      if escaped {
+        escaped = false
+      } else if ch == '\\' {
+        escaped = true
+      } else if ch == '"' {
+        quoted = false
+      }
+    } else {
+      match ch {
+        '"' => quoted = true
+        '{' | '[' => {
+          depth += 1
+          if depth > max_depth {
+            raise Invalid(invalid)
+          }
+        }
+        '}' | ']' => {
+          if depth == 0 {
+            raise Invalid(invalid)
+          }
+          depth -= 1
+        }
+        _ => ()
+      }
+    }
+  }
+  @json.parse(input, reject_duplicate_keys=true) catch {
+    _ => raise Invalid(invalid)
+  }
+}
+
+///|
 /// Parse cairndom.graph.v1 with string node IDs and strict JSON keys.
 pub fn parse_graph(input : String) -> Graph raise GraphError {
   let (graph, _) = parse_graph_with_names(input)
@@ -65,14 +109,7 @@ fn parse_graph_with_names(
   if input.length() > 2_097_152 {
     raise Invalid("graph JSON exceeds 2 MiB")
   }
-  let value = @json.parse(
-    input,
-    max_nesting_depth=8,
-    reject_duplicate_keys=true,
-  ) catch {
-    _ => raise Invalid("invalid JSON, repeated key or excessive nesting")
-  }
-  decode_graph(value)
+  decode_graph(parse_bounded_json(input, 8))
 }
 
 ///|

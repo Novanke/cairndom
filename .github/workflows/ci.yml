@@ -17,10 +17,8 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
-      - name: Install verified official MoonBit
+      - name: Install current official MoonBit
         shell: bash
-        env:
-          MOONBIT_INSTALL_VERSION: '0.10.20+65efd5b93'
         run: |
           if [ "$RUNNER_OS" = Windows ]; then
             pwsh -NoProfile -Command 'irm https://cli.moonbitlang.com/install/powershell.ps1 | iex'
@@ -33,6 +31,26 @@ jobs:
         shell: bash
         run: |
           moon version --all
+          python - <<'PY'
+          import re
+          import subprocess
+
+          version = subprocess.check_output(["moonc", "-v"], text=True).strip()
+          match = re.fullmatch(
+              r"v?(\d+)\.(\d+)\.(\d+)(?:-([\w.-]+))?(?:\+[\w.-]+)?(?:\s+.*)?",
+              version,
+          )
+          if not match:
+              raise SystemExit(f"Cannot determine MoonBit compiler version: {version}")
+          release = tuple(map(int, match.groups()[:3]))
+          prerelease = match[4]
+          if release < (1, 0, 0) or (
+              release == (1, 0, 0)
+              and prerelease is not None
+              and not re.fullmatch(r"rc[1-9]\d*(?:\.[\w.-]+)?", prerelease)
+          ):
+              raise SystemExit(f"CairnDom requires moonc >= 1.0.0-rc1, found {version}")
+          PY
           moon fmt --check
           moon info
           git diff --exit-code -- '*.mbti'
@@ -40,6 +58,7 @@ jobs:
           moon check --target js --deny-warn
           moon test --target wasm-gc --deny-warn
           moon test --target js --deny-warn
+          moon build --target wasm-gc --release --deny-warn
           moon build --target js --release --deny-warn
           moon run examples/sdk --target wasm-gc --release --deny-warn
           moon run examples/sdk --target js --release --deny-warn

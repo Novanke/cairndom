@@ -1,6 +1,6 @@
 name = "Novanke/cairndom"
 
-version = "0.8.22"
+version = "0.8.23"
 
 readme = "README.md"
 
@@ -13,3 +13,5 @@ keywords = [ "graph", "dominators", "compiler", "control-flow" ]
 description = "Portable control-flow dominance, frontiers, loops and exit-path analysis."
 
 preferred_target = "js"
+
+supported_targets = "+js+wasm-gc"

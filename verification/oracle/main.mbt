@@ -48,7 +48,7 @@ fn source() -> Json raise {
   if input.error() != "" {
     fail(input.error())
   }
-  @json.parse(input.text(), max_nesting_depth=16, reject_duplicate_keys=true)
+  @json.parse(input.text(), reject_duplicate_keys=true)
 }
 
 ///|

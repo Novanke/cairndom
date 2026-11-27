@@ -6,7 +6,11 @@ CairnDom 是纯 MoonBit 控制流图分析基础库，提供支配树、支配�
 
 ## 运行
 
-使用官方 MoonBit 工具链，最低支持 moonc **0.10.20**。本版验证的精确版本为 **0.10.20+65efd5b93**。纯库支持 Wasm GC 和 JavaScript。文件 CLI 要求 Node.js **22.16+**。
+按 [MoonBit 官方安装指南](https://www.moonbitlang.com/download) 安装工具链。最低要求为 moonc **1.0.0-rc1**，本版验证的精确编译器为 **1.0.0-rc1+3c0520448**。用 `moon version --all` 核对本机版本。纯库支持 Wasm GC 和 JavaScript，文件 CLI 要求 Node.js **22.16+**。在仓库根目录可以直接运行最小 SDK 示例和下面的文件示例。
+
+```sh
+moon run examples/sdk --target wasm-gc --release --deny-warn
+```
 
 ```sh
 moon build --target js --release --deny-warn
@@ -125,7 +129,7 @@ node _build/js/release/build/cmd/main/main.js loop-boundary examples/branch-loop
 ## SDK
 
 ```sh
-moon add Novanke/cairndom@0.8.22
+moon add Novanke/cairndom@0.8.23
 ```
 
 在调用方 `moon.pkg` 中导入 `"Novanke/cairndom" @dom`。可直接构建 `Graph`，或调用 `parse_graph`。核心入口为 `analyze`，也可单独调用 `dominators` 或 `postdominators`。图边使用节点数组索引。只需要自然循环边界或控制依赖证据时，可以直接调用相应查询，结果沿用完整分析的图校验和排序规则。
@@ -262,11 +266,13 @@ moon run examples/query_sdk --target js --release --deny-warn
 ## 验证与维护
 
 ```sh
+moon version --all
 moon fmt --check
 moon check --target wasm-gc --deny-warn
 moon check --target js --deny-warn
 moon test --target wasm-gc --deny-warn
 moon test --target js --deny-warn
+moon build --target wasm-gc --release --deny-warn
 moon build --target js --release --deny-warn
 python scripts/verify_cli.py
 python scripts/verify_ssa_cli.py

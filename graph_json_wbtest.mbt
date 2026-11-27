@@ -147,3 +147,27 @@ test "graph wire errors keep decode and structural validation order" {
     assert_eq(error, detail)
   }
 }
+
+///|
+test "JSON depth limit counts containers outside quoted strings" {
+  let value = "quote \" and backslash \\ [[[{{{]]]"
+  let string = Json::string(value).stringify()
+  let at_limit = "{\"x\":" + "[".repeat(7) + string + "]".repeat(7) + "}"
+  assert_eq(parse_bounded_json(at_limit, 8).stringify(), at_limit)
+  for
+    input in [
+      "[" + at_limit + "]",
+      "{\"x\":" + "[".repeat(8) + "]".repeat(8) + "}",
+      (
+        #|{"x":1,"\u0078":2}
+      ),
+    ] {
+    let detail = try {
+      ignore(parse_graph(input))
+      ""
+    } catch {
+      Invalid(message) => message
+    }
+    assert_eq(detail, "invalid JSON, repeated key or excessive nesting")
+  }
+}

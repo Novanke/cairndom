@@ -77,13 +77,7 @@ pub fn query_json_text(input : String) -> String raise GraphError {
   if input.length() > 2_097_152 {
     raise Invalid("query JSON exceeds 2 MiB")
   }
-  let value = @json.parse(
-    input,
-    max_nesting_depth=12,
-    reject_duplicate_keys=true,
-  ) catch {
-    _ => raise Invalid("invalid JSON, repeated key or excessive nesting")
-  }
+  let value = parse_bounded_json(input, 12)
   let object = fields(value, ["schema", "graph", "tree", "queries"])
   if text(required(object, "schema")) != "cairndom.queries.v1" {
     raise Invalid("schema must be cairndom.queries.v1")
