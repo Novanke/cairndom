@@ -224,23 +224,38 @@ fs.linkSync = () => {
                 and owner.read_bytes() == marker
                 and target.read_bytes() == b"existing output" and os.path.samefile(linked / "data", target),
                 "inspection changed files or hard links")
-        churn = checks.failure_preload("stage-scan-churn", """
+        def when_scan_closes(action):
+            return f"""
 const open = fs.opendirSync;
-fs.opendirSync = (path, ...options) => {
+fs.opendirSync = (path, ...options) => {{
   const dir = open(path, ...options);
-  if (path === process.argv.at(-1)) {
+  if (path === process.argv.at(-1)) {{
     const close = dir.closeSync.bind(dir);
-    dir.closeSync = () => { fs.mkdtempSync(path + '/unrelated-'); close(); };
-  }
+    dir.closeSync = () => {{ {action} close(); }};
+  }}
   return dir;
-};
-""")
+}};
+"""
+        churn = checks.failure_preload("stage-scan-churn", when_scan_closes("fs.mkdtempSync(path + '/unrelated-');"))
         partial = json.loads(checks.invoke(tasks, preload=churn))
         require(partial.pop("scan_complete", None) is False and partial == report,
                 "scan did not preserve confirmed tasks with incomplete coverage")
         checks.invoke(command, preload=churn,
                       error={"error": "io", "detail": "inspection directory changed during reading"})
         require(checks.invoke(tasks) == stable, "stable task report bytes changed")
+        added_link = foreign / "concurrent-link"
+        link = f"fs.linkSync({json.dumps(str(data))}, {json.dumps(str(added_link))});"
+        data_change = checks.failure_preload("stage-data-churn", when_scan_closes(link))
+        changed = json.loads(checks.invoke(tasks, preload=data_change))
+        entries[stage.name] = dict(dead, observation="changed", possible_residue=False,
+                                   ownership="unverified", activity="unknown", task_id=None, output=None)
+        require(changed == dict(report, entries=list(entries.values())),
+                "task report confirmed stale staged data")
+        require(os.path.samefile(data, added_link) and data.read_bytes() == original
+                and owner.read_bytes() == marker, "inspection changed the staged data or its link")
+        entries[stage.name] = dict(dead, observation="data_with_other_links")
+        require(json.loads(checks.invoke(tasks)) == dict(report, entries=list(entries.values())),
+                "rescan did not confirm the current link count")
 
 
 def verify_durable_output(checks, graph, legacy, fixtures):

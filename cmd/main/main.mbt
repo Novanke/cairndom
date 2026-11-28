@@ -170,12 +170,17 @@ extern "js" fn file_io(
   #|           } finally { contents.closeSync(); }
   #|           const known = names.length < 3 && names.every(file => file === 'data' || file === 'owner.json');
   #|           let observation = known ? 'empty' : 'unexpected_contents';
+  #|           let sameData = () => true;
   #|           if (known && names.includes('data')) {
   #|             const data = path.join(candidate, 'data');
   #|             const file = stat(data);
   #|             if (file.isFile()) {
-  #|               const again = stat(data);
-  #|               if (!again.isFile() || stamp(file) !== stamp(again) || file.nlink !== again.nlink) {
+  #|               const sampled = stamp(file);
+  #|               sameData = () => {
+  #|                 const current = stat(data);
+  #|                 return current.isFile() && stamp(current) === sampled && current.nlink === file.nlink;
+  #|               };
+  #|               if (!sameData()) {
   #|                 observation = 'changed';
   #|               } else if (file.nlink === 1n) {
   #|                 observation = 'data_only';
@@ -197,7 +202,7 @@ extern "js" fn file_io(
   #|               checkLinks(candidate);
   #|               const current = stat(candidate);
   #|               return stageBinding(stat(target), current, name) === binding &&
-  #|                 stamp(current) === stamp(before) && marker.sameName();
+  #|                 stamp(current) === stamp(before) && marker.sameName() && sameData();
   #|             } catch { return false; }
   #|           };
   #|           return marker ? {

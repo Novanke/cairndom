@@ -798,6 +798,21 @@ compiler floor, and runs both release builds, tests, examples and the file
 oracles. The module declares Wasm GC and JavaScript as supported targets. The
 file-based CLI and the reference command use JavaScript.
 
+## 0.8.24 Stage data revalidation
+
+The detailed inspection now rechecks an observed data file after sampling
+process identities. A change in file type, identity, metadata or hard-link
+count marks the entry `changed` with unverified ownership and unknown activity.
+The check uses file metadata and leaves the data and its links untouched.
+
+A real-file regression adds a hard link in a sibling directory after the stage
+has been inspected. This left both the stage directory and its owner record
+intact, so 0.8.23 incorrectly confirmed the original observation. The next
+stable scan sees the additional link. On Windows, all 100 Wasm GC and 101
+JavaScript tests, both release builds, all three SDK examples on both backends,
+and 450 CLI invocations passed with moonc 1.0.0-rc1+3c0520448 and Node.js 22.16.0.
+Local Windows verification omitted symlink creation and POSIX FIFO cases.
+
 Next useful work follows correctness evidence and real consumers. Candidate
 directions include safe stage ownership/cleanup and explicit data-dependence inputs for program
 slicing. General source-language/IR parsing,

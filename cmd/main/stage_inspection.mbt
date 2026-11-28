@@ -83,8 +83,11 @@ fn inspect_stages_command(args : Array[String]) -> Unit raise CommandError {
   let probes = stage_processes(FixedArray::from_array(pids[:]))
   let entries = observations.mapi((index, entry) => {
     let owner = owners[index]
-    let current = tasks && owner is Some(_) && entry.still_current()
     let physical = entry.observation()
+    let current = tasks &&
+      owner is Some(_) &&
+      physical != "changed" &&
+      entry.still_current()
     let observation = if tasks && owner is Some(_) && !current {
       "changed"
     } else if entry.has_marker() &&

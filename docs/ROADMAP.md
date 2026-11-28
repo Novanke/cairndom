@@ -80,6 +80,8 @@
   from the entry before constructing the reverse exit graph and postdominator tree.
 - Check directed-edge uniqueness using destination bits grouped by source
   during graph import and each validation of a mutable SDK graph.
+- Recheck observed stage-data metadata and hard-link counts before confirming a
+  task inspection entry. Preserve the files for later review.
 
 ## Next candidates
 
